@@ -50,9 +50,19 @@ if not errorlevel 1 (
  if errorlevel 1 start "" /min ollama serve
 )
 echo Abrindo painel Forex-Pobre...
-start "Forex-Pobre Frontend" /min cmd /c "npm run dev:client >> logs\frontend.log 2>&1"
+start "Forex-Pobre Frontend 24-7" /min cmd /c ""%~dp0RUN-FOREX-POBRE-FRONTEND.bat""
 timeout /t 3 /nobreak >nul
-start "" "http://127.0.0.1:5174"
+set "CHROME="
+if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if not defined CHROME if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if not defined CHROME if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "CHROME=%LocalAppData%\Google\Chrome\Application\chrome.exe"
+if defined CHROME (
+ echo Abrindo especificamente no Google Chrome...
+ start "" "%CHROME%" --new-window "http://127.0.0.1:5174"
+) else (
+ echo [AVISO] Google Chrome nao encontrado. Abra manualmente http://127.0.0.1:5174
+ echo [AVISO] O Edge NAO sera aberto automaticamente.
+)
 
 :loop
 echo [%date% %time%] Backend iniciado >> logs\backend.log
