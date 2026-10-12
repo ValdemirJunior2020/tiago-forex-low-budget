@@ -81,7 +81,7 @@ export class ShadowBrokerFirst {
   const exit=new D(p.direction==='long'?q.bid:q.ask),entry=new D(p.entry),units=new D(p.units)
   const prior=p.peakExit?new D(p.peakExit):exit
   if(!p.peakExit||(p.direction==='long'?exit.gt(prior):exit.lt(prior)))p.peakExit=exit.toString()
-  const peak=new D(p.peakExit)
+  const peak=new D(p.peakExit!)
   const profit=(p.direction==='long'?exit.minus(entry):entry.minus(exit)).mul(units)
   const peakProfit=(p.direction==='long'?peak.minus(entry):entry.minus(peak)).mul(units)
   const initialRisk=entry.minus(new D(p.originalStop)).abs().mul(units)
