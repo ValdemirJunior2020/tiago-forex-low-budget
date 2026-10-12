@@ -718,12 +718,16 @@ body{background:radial-gradient(circle at 45% -10%,rgba(104,212,231,.14),transpa
 @media(max-width:560px){.forex-pobre-budget{padding:17px}.fp-budget-stats{grid-template-columns:1fr 1fr}.fp-budget-stats>div{padding:10px}.fp-budget-title strong{width:100%}}
 
 
-/* Forex-Pobre local visual activity; only the API polling cycle shows the GIF. */
-.fp-activity{display:flex;align-items:center;gap:9px;margin-left:auto;min-width:168px;max-width:250px}
-.fp-loader{width:38px;height:38px;object-fit:contain;flex-shrink:0;border-radius:8px;background:transparent}
+/* Forex-Pobre activity GIF: visible during broker/AI monitoring. */
+.fp-activity{display:flex;align-items:center;gap:12px;margin-left:auto;min-width:240px;max-width:320px}
+.fp-loader{width:64px;height:64px;object-fit:contain;flex-shrink:0;border-radius:10px;background:transparent}
 .fp-activity-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#658299}
 .fp-activity-dot-active{background:#7fe8c8;box-shadow:0 0 0 4px rgba(127,232,200,.1)}
 .fp-activity-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
-.fp-activity-copy small{font-size:9px;letter-spacing:.08em;color:#a8bed6}
-.fp-activity-copy b{font-size:11px;line-height:1.25;color:#eafbf9}
-@media (max-width:880px){.fp-activity{min-width:120px;max-width:190px}}
+.fp-activity-copy small{font-size:10px;letter-spacing:.08em;color:#a8bed6}
+.fp-activity-copy b{font-size:13px;line-height:1.25;color:#eafbf9}
+@media(max-width:880px){
+  .fp-activity{min-width:155px;max-width:220px;gap:8px}
+  .fp-loader{width:48px;height:48px}
+  .fp-activity-copy b{font-size:11px}
+}
