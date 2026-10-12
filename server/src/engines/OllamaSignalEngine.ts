@@ -6,6 +6,7 @@ import {env} from '../config.js'
 import type {BrokerQuote,Direction} from '../types.js'
 import type {Candle} from '../indicators.js'
 import {featuresFromCandles,OandaOutcomeResearch} from './OandaOutcomeResearch.js'
+import {openVikingBridge} from './OpenVikingBridge.js'
 import type {MarketFeatures} from './OandaOutcomeResearch.js'
 import {scanOllamaSetups,questionableRsiReason} from './OllamaSignalReview.js'
 import type {SetupReview} from './OllamaSignalReview.js'
@@ -31,7 +32,7 @@ type LabState={
  paused:boolean;status:'WAITING'|'SCANNING'|'READY'|'ERROR'|'PAUSED'|'MARKET_CLOSED';
  lastMarket?:(MarketFeatures&{symbol:string;at:string;spreadPips:number})|null;lastSetup?:SetupReview|null
 }
-type Market={symbol:string;quote:BrokerQuote;m5:Candle[];m10:Candle[];indicators:MarketFeatures;brokerLessons:ReturnType<OandaOutcomeResearch['lessonsFor']>;setup:SetupReview}
+type Market={symbol:string;quote:BrokerQuote;m5:Candle[];m10:Candle[];indicators:MarketFeatures;brokerLessons:ReturnType<OandaOutcomeResearch['lessonsFor']>;vikingMemories?:string[];setup:SetupReview}
 type ReadBroker=Pick<OandaReadOnly,'quote'|'candles'>
 type Options={baseDir?:string;logDir?:string;decide?:(market:Market)=>Promise<AiDecision>;now?:()=>Date}
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../../../')
@@ -55,6 +56,7 @@ export async function queryIndependentOllama(market:Market):Promise<AiDecision>{
   const base={symbol:market.symbol,quote:market.quote,mode:'OANDA_PRACTICE_ONLY',
    m5:market.m5.slice(-25),m10:market.m10.slice(-20),indicators:market.indicators,
    objectiveSetup:market.setup,verifiedShadowBrokerExamples:market.brokerLessons,
+   optionalVerifiedVikingMemories:market.vikingMemories||[],
    brokerHistoryNote:'Historical broker sample is optional context; do not default to WAIT just because confirmed broker outcomes are few.'}
   let failure='Model response invalid'
   for(let attempt=0;attempt<3;attempt++){
@@ -228,7 +230,8 @@ export class OllamaSignalEngine{
    this.state.lastSetup=setup
    this.state.lastMarket={...indicators,symbol,at:last.time,spreadPips}
    this.state.status='SCANNING';this.save()
-   const d=parseAiLabDecision(await this.decide({symbol,quote:q,m5,m10,indicators,brokerLessons:this.research?.lessonsFor(symbol)||[],setup}))
+   const memories=await openVikingBridge.recall(symbol)
+   const d=parseAiLabDecision(await this.decide({symbol,quote:q,m5,m10,indicators,brokerLessons:this.research?.lessonsFor(symbol)||[],vikingMemories:memories,setup}))
    this.state.decisions++;this.state.lastReviewedAt=this.now().toISOString()
    this.state.lastDecision={...d,symbol,at:this.state.lastReviewedAt}
    this.state.status='READY'
