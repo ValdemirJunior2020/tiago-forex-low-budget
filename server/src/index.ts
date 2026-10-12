@@ -10,6 +10,7 @@ import{OllamaPracticeMirror}from'./engines/OllamaPracticeMirror.js'
 import{isTagged}from'./broker/OllamaPracticeBroker.js'
 import{lowBudgetGuard,SHADOW_TAG}from'./risk/LowBudgetGuard.js'
 import{Decimal}from'decimal.js'
+import {openVikingBridge} from './engines/OpenVikingBridge.js'
 
 const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowBrokerFirst(broker),
  ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot())
@@ -37,6 +38,8 @@ app.get('/health',async(_q,res)=>{
     engines:{shadow:'OANDA_PRACTICE',ollama:'OANDA_PRACTICE',shadowRiskState:'LOCAL_NOT_A_PROFIT_SOURCE'}
   })
 })
+
+app.get('/api/openviking',async(_q,res)=>res.json(await openVikingBridge.health()))
 
 app.get('/api/low-budget',async(_q,res)=>{
  try{const v=await lowBudgetGuard.snapshot()
