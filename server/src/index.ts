@@ -8,7 +8,7 @@ import{env,BROKER_MODE,OANDA_DEMO_MIRROR_ENABLED}from'./config.js'
 import{ShadowBrokerFirst}from'./engines/ShadowBrokerFirst.js'
 import{OllamaPracticeMirror}from'./engines/OllamaPracticeMirror.js'
 import{isTagged}from'./broker/OllamaPracticeBroker.js'
-import{lowBudgetGuard}from'./risk/LowBudgetGuard.js'
+import{lowBudgetGuard,SHADOW_TAG}from'./risk/LowBudgetGuard.js'
 import{Decimal}from'decimal.js'
 
 const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowBrokerFirst(broker),
@@ -111,6 +111,18 @@ app.post('/api/plan',async(req,res)=>{
   }catch(e){
     res.status(400).json({error:e instanceof Error?e.message:String(e)})
   }
+})
+
+app.get('/api/shadow-results',async(_q,res)=>{
+ try{
+  const all=await broker.closedTrades(250)
+  const own=(all as any[]).filter(t=>t.clientExtensions?.tag===SHADOW_TAG)
+  const pl=own.reduce((acc,t)=>acc.plus(String(t.realizedPL||'0')),new Decimal(0))
+  res.json({source:'OANDA_API',strategy:'SHADOW_3_OF_4',realizedPL:pl.toString(),
+   trades:own.length,wins:own.filter(t=>new Decimal(String(t.realizedPL||'0')).gt(0)).length,
+   losses:own.filter(t=>new Decimal(String(t.realizedPL||'0')).lt(0)).length,
+   history:own.slice(0,20).map(t=>({tradeId:t.id,symbol:t.instrument,realizedPL:t.realizedPL,closedAt:t.closeTime}))})
+ }catch(e){res.status(503).json({source:'OANDA_API',status:'UNAVAILABLE',error:String(e)})}
 })
 
 app.get('/api/engine',(_q,res)=>res.json({source:'OANDA_PRACTICE_ENGINE',...engine.snapshot()}))
