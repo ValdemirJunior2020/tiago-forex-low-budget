@@ -9,6 +9,7 @@ export const OLLAMA_TAG='FOREX_POBRE_OLLAMA'
 export class LowBudgetGuard {
  private tail:Promise<void>=Promise.resolve()
  private risk=new RiskManager(resolve(dirname(fileURLToPath(import.meta.url)),'../../../data/low-budget-broker-equity.json'))
+ assertIdentity(){this.ensure()}
  private ensure(){
   if(!env.OANDA_API_TOKEN||!env.OANDA_ACCOUNT_ID||!env.LOW_BUDGET_ALLOWED_ACCOUNT_ID||env.OANDA_ACCOUNT_ID!==env.LOW_BUDGET_ALLOWED_ACCOUNT_ID)throw Error('LOW_BUDGET_ACCOUNT_NOT_VERIFIED')
   if(env.OANDA_REST_BASE_URL.replace(/\/$/,'')!=='https://api-fxpractice.oanda.com')throw Error('PRACTICE_ONLY')
