@@ -36,7 +36,7 @@ const copy={
     exposure:'Per-trade risk',manual:'OANDA Practice broker execution only',
     openTitle:'Open Positions',none:'No open positions right now.',
     noData:'Waiting for broker data',updated:'Auto refresh every 5 seconds',
-    assistant:'Tiago AI Desk',assistantSub:'Local Ollama trade critic and market context',
+    assistant:'Forex-Pobre AI Desk',assistantSub:'Local Ollama trade critic and market context',
     waiting:'Waiting for Ollama',safe:'Risk rules remain active without AI.',
     profit:'Profit mindset',profitSub:'Protect downside. Measure edge. Compound only what works.'
   },
@@ -70,21 +70,25 @@ function App(){
   const[engine,setEngine]=useState<any>(null)
   const[oandaAudit,setOandaAudit]=useState<any>(null)
   const[ollamaMirror,setOllamaMirror]=useState<any>(null)
+  const[shadowOfficial,setShadowOfficial]=useState<any>(null)
+  const[budgetInfo,setBudgetInfo]=useState<any>(null)
   const x=copy[lang]
 
   const load=async()=>{
     setLoading(true)
     try{
-      const[h,a,p,sm,audit,mirror,...qs]=await Promise.all([
-        fetch('http://127.0.0.1:8790/health').then(r=>r.json()).catch(()=>null),
-        fetch('http://127.0.0.1:8790/api/account').then(r=>r.ok?r.json():null).catch(()=>null),
-        fetch('http://127.0.0.1:8790/api/positions').then(r=>r.ok?r.json():[]).catch(()=>[]),
-        fetch('http://127.0.0.1:8790/api/engine').then(r=>r.ok?r.json():null).catch(()=>null),
-        fetch('http://127.0.0.1:8790/api/oanda-audit').then(r=>r.ok?r.json():null).catch(()=>null),
-        fetch('http://127.0.0.1:8790/api/ollama-mirror').then(r=>r.ok?r.json():null).catch(()=>null),
-        ...PAIRS.map(pair=>fetch(`http://127.0.0.1:8790/api/quote/${pair}`).then(r=>r.ok?r.json():null).catch(()=>null))
+      const[h,a,p,sm,audit,mirror,shadowNew,budgetNew,...qs]=await Promise.all([
+        fetch('http://127.0.0.1:8791/health').then(r=>r.json()).catch(()=>null),
+        fetch('http://127.0.0.1:8791/api/account').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('http://127.0.0.1:8791/api/positions').then(r=>r.ok?r.json():[]).catch(()=>[]),
+        fetch('http://127.0.0.1:8791/api/engine').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('http://127.0.0.1:8791/api/oanda-audit').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('http://127.0.0.1:8791/api/ollama-mirror').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('http://127.0.0.1:8791/api/shadow-results').then(r=>r.ok?r.json():null).catch(()=>null),
+        fetch('http://127.0.0.1:8791/api/low-budget').then(r=>r.ok?r.json():null).catch(()=>null),
+        ...PAIRS.map(pair=>fetch(`http://127.0.0.1:8791/api/quote/${pair}`).then(r=>r.ok?r.json():null).catch(()=>null))
       ])
-      setHealth(h);setAccount(a);setPositions(Array.isArray(p)?p:[]);setEngine(sm||null);setOandaAudit(audit);setOllamaMirror(mirror)
+      setHealth(h);setAccount(a);setPositions(Array.isArray(p)?p:[]);setEngine(sm||null);setOandaAudit(audit);setOllamaMirror(mirror);setShadowOfficial(shadowNew);setBudgetInfo(budgetNew)
       const next:Record<string,Quote>={}
       qs.forEach((q:any)=>{if(q?.symbol)next[q.symbol]=q})
       setQuotes(next)
@@ -98,8 +102,8 @@ function App(){
     return Number.isFinite(n)?n:0
   },[account])
 
-  const shadowLearning=engine?.brokerLearning?.status==='READY'?engine.brokerLearning?.summary:null
-  const shadowRealized=shadowLearning?.trades?shadowLearning.netPL:null
+  const shadowLearning=shadowOfficial?.source==='OANDA_API'?{...shadowOfficial,netPL:Number(shadowOfficial.realizedPL)}:null
+  const shadowRealized=shadowLearning?.netPL??null
   const shadowOpenTrade=oandaAudit?.mirrorTrade??null
   const shadowOpenPL=shadowOpenTrade?.unrealizedPL!=null?Number(shadowOpenTrade.unrealizedPL):null
   const shadowTradeId=shadowOpenTrade?.id??null
@@ -108,8 +112,8 @@ function App(){
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand-mini">
-        <img src="/logo.png" alt="Tiago Bot" onError={e=>{e.currentTarget.style.display='none'}}/>
-        <div><strong>Tiago Bot</strong><span>FOREX</span></div>
+        <img src="/logo.png" alt="Forex-Pobre" onError={e=>{e.currentTarget.style.display='none'}}/>
+        <div><strong>Forex-Pobre</strong><span>OANDA LOW BUDGET</span></div>
       </div>
 
       <nav>
@@ -145,10 +149,10 @@ function App(){
     <main className="content">
       <header className="topbar">
         <div className="hero-brand">
-          <div className="logo-frame"><img src="/logo.png" alt="Tiago Bot Forex" onError={e=>{e.currentTarget.style.display='none'}}/></div>
+          <div className="logo-frame"><img src="/logo.png" alt="Forex-Pobre" onError={e=>{e.currentTarget.style.display='none'}}/></div>
           <div>
-            <div className="eyebrow"><Sparkles size={14}/> PROFITMIND ENGINE</div>
-            <h1>Tiago <span>Bot</span></h1>
+            <div className="eyebrow"><Sparkles size={14}/> FOREX-POBRE • CAPITAL PROTEGIDO</div>
+            <h1>Forex <span>Pobre</span></h1>
             <p>{x.subtitle}</p>
           </div>
         </div>
@@ -167,6 +171,16 @@ function App(){
         <div className="strip-note">{x.updated}</div>
       </section>
 
+      <section className="forex-pobre-budget" aria-label="Limite operacional Forex-Pobre">
+        <div className="fp-budget-title"><span>FOREX-POBRE / OANDA PRACTICE</span><strong>US$ 1.000</strong><small>CAPITAL OPERACIONAL • SEM SIMULADOR</small></div>
+        <div className="fp-budget-stats">
+          <div><span>SALDO OFICIAL OANDA</span><b>{budgetInfo?money(budgetInfo.brokerBalance):'—'}</b></div>
+          <div><span>RISCO POR ORDEM</span><b>US$ 2,50</b></div>
+          <div><span>MARGEM MÁX. COMPARTILHADA</span><b>US$ 200</b></div>
+          <div><span>EXECUÇÃO</span><b className={budgetInfo?.tradingEnabled?'profit-up':'profit-down'}>{budgetInfo?.tradingEnabled?'OANDA ARMED':'DESATIVADA'}</b></div>
+        </div>
+        <p>Shadow 3/4 + Ollama compartilham o mesmo limite e usam apenas execuções confirmadas pela OANDA. Saldo oficial e orçamento operacional são exibidos separadamente.</p>
+      </section>
       <section className="broker-overview" aria-label={lang==='pt'?'Resumo oficial da conta OANDA':'Official OANDA account summary'}>
          <div className="broker-overview-head">
            <div>
@@ -347,7 +361,7 @@ function App(){
              :String(ollamaMirror.latestError)}
           </p>}
           {ollamaMirror?.status==='REVIEW_REQUIRED'&&<button type="button" className="ollama-recheck" onClick={async()=>{
-            const r=await fetch('http://127.0.0.1:8790/api/ollama-mirror/reconcile',{method:'POST'}).catch(()=>null)
+            const r=await fetch('http://127.0.0.1:8791/api/ollama-mirror/reconcile',{method:'POST'}).catch(()=>null)
             if(r?.ok)setOllamaMirror(await r.json())
           }}>{lang==='pt'?'Conferir trade na OANDA (somente leitura)':'Recheck OANDA trade (read-only)'}</button>}
           {ollamaMirror?.events?.[0]&&<p className="ollama-oanda-event">{ollamaMirror.events[0].event}: {ollamaMirror.events[0].detail}</p>}
