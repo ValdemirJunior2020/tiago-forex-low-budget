@@ -3,6 +3,7 @@ import {resolve,dirname} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {env} from '../config.js'
 import {SHADOW_TAG} from '../risk/LowBudgetGuard.js'
+import {openVikingBridge} from './OpenVikingBridge.js'
 import {strategyContext} from '../indicators.js'
 import type {Candle} from '../indicators.js'
 import type {OandaReadOnly} from '../broker/OandaReadOnly.js'
@@ -239,6 +240,8 @@ export class OandaOutcomeResearch{
    this.closedTradesSeen=raw.length;this.linkedIds=ids.size
    this.missingAttribution=raw.length-matched.length
    this.saveLessons()
+   // Never block broker polling or orders on a memory/vector service.
+   void openVikingBridge.syncLessons(this.lessons)
   }catch(e){
    this.status='UNAVAILABLE';this.error=e instanceof Error?e.message:String(e)
    // Previous observations remain available but are explicitly marked stale/unavailable.
