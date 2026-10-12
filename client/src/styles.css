@@ -718,16 +718,35 @@ body{background:radial-gradient(circle at 45% -10%,rgba(104,212,231,.14),transpa
 @media(max-width:560px){.forex-pobre-budget{padding:17px}.fp-budget-stats{grid-template-columns:1fr 1fr}.fp-budget-stats>div{padding:10px}.fp-budget-title strong{width:100%}}
 
 
-/* Forex-Pobre activity GIF: visible during broker/AI monitoring. */
-.fp-activity{display:flex;align-items:center;gap:12px;margin-left:auto;min-width:240px;max-width:320px}
-.fp-loader{width:64px;height:64px;object-fit:contain;flex-shrink:0;border-radius:10px;background:transparent}
+/* Candlestick GIF zoomed within a clear, compact monitoring window. */
+.status-strip > .fp-activity{
+  display:flex;align-items:center;gap:13px;margin-left:auto;
+  min-width:290px;max-width:350px;padding:5px 12px;
+  border-right:1px solid rgba(130,158,197,.10)
+}
+.fp-loader-viewport{
+  position:relative;width:112px;height:84px;flex:0 0 112px;
+  overflow:hidden;border-radius:12px;background:rgba(3,16,30,.42);
+  border:1px solid rgba(120,235,216,.16)
+}
+.fp-loader{
+  position:absolute;top:50%;left:50%;width:208px;height:208px;
+  max-width:none;object-fit:contain;border:0;background:transparent;
+  transform:translate(-50%,-50%);
+}
 .fp-activity-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#658299}
 .fp-activity-dot-active{background:#7fe8c8;box-shadow:0 0 0 4px rgba(127,232,200,.1)}
-.fp-activity-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fp-activity-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
 .fp-activity-copy small{font-size:10px;letter-spacing:.08em;color:#a8bed6}
-.fp-activity-copy b{font-size:13px;line-height:1.25;color:#eafbf9}
+.fp-activity-copy b{font-size:13px;line-height:1.35;color:#eafbf9}
+@media(max-width:1100px){
+ .status-strip > .fp-activity{min-width:235px;max-width:260px;gap:9px}
+ .fp-loader-viewport{width:90px;height:74px;flex-basis:90px}
+ .fp-loader{width:180px;height:180px}
+}
 @media(max-width:880px){
-  .fp-activity{min-width:155px;max-width:220px;gap:8px}
-  .fp-loader{width:48px;height:48px}
-  .fp-activity-copy b{font-size:11px}
+ .status-strip > .fp-activity{min-width:190px;max-width:220px}
+ .fp-loader-viewport{width:75px;height:64px;flex-basis:75px}
+ .fp-loader{width:160px;height:160px}
+ .fp-activity-copy b{font-size:11px}
 }
