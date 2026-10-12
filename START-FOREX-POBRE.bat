@@ -43,6 +43,7 @@ if not errorlevel 1 (
   exit /b 1
  )
  echo [OK] Forex-Pobre ja esta rodando. Nenhum segundo backend sera iniciado.
+ set "ALREADY_RUNNING=1"
  goto open_chrome
 )
 netstat -ano | findstr /R /C:":5174 .*LISTENING" >nul
@@ -72,6 +73,8 @@ if defined CHROME (
  echo [AVISO] Google Chrome nao encontrado. Abra manualmente http://127.0.0.1:5174
  echo [AVISO] O Edge NAO sera aberto automaticamente.
 )
+
+if defined ALREADY_RUNNING exit /b 0
 
 :loop
 echo [%date% %time%] Backend iniciado >> logs\backend.log
