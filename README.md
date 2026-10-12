@@ -28,3 +28,21 @@ Place your local images at `client/public/logo.jpeg` and `client/public/loader.g
 Run npm install and npm run verify. GitHub Actions runs the same tests. Broker orders cannot be tested by CI without the user's private local OANDA credentials.
 
 For November, evaluate OANDA-confirmed performance before deciding on a separately authorized and implemented LIVE project.
+
+## OpenViking — optional local trade memory
+This integration is **disabled by default** and does not change trading signals, orders or Shadow 3/4.
+Once OpenViking is configured and serving on http://127.0.0.1:1933, add to this repo's private `.env`:
+```ini
+OPENVIKING_ENABLED=true
+OPENVIKING_API_KEY=
+```
+If your local OpenViking configuration requires an API key, set `OPENVIKING_API_KEY` privately.
+Never commit your `.env`.
+
+Restart only this Forex-Pobre process after checking broker positions. To verify locally,
+visit http://127.0.0.1:8791/api/openviking. The status includes `reachable`, `lastSync`,
+`lastError`, and the number of verified lessons sent this run.
+Lessons go to account-isolated `viking://resources/forex-pobre-<account hash>/trade-<trade ID>.md`.
+Only *closed, OANDA-attributed Shadow trades* are sent; no token, account number, or unverified local
+paper profits are exported. The local verified OANDA study and six historical charts keep working
+without OpenViking, and a disconnected OpenViking cannot prevent or trigger broker orders.
