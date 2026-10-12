@@ -1,9 +1,10 @@
 import {Decimal} from 'decimal.js'
+import {lowBudgetGuard,OLLAMA_TAG} from '../risk/LowBudgetGuard.js'
 import {createHash} from 'node:crypto'
 import {env} from '../config.js'
 import {OandaReadOnly} from './OandaReadOnly.js'
 
-export const OLLAMA_TRADE_TAG='TIAGO_OLLAMA'
+export const OLLAMA_TRADE_TAG=OLLAMA_TAG
 export type TaggedTrade={id:string;instrument:string;state:string;currentUnits:string;initialUnits?:string;realizedPL?:string;unrealizedPL?:string;price?:string;stopLossOrder?:{price?:string};clientExtensions?:{id?:string;tag?:string}}
 export type OpenSpec={symbol:'EUR_USD'|'GBP_USD';direction:'long'|'short';units:string;hardStop:string;target?:string;clientId:string;referencePrice:string}
 const practice='https://api-fxpractice.oanda.com'
@@ -85,6 +86,7 @@ export class OllamaPracticeBroker{
   return{price:price.toString(),stop:await this.readOnly.formatPrice(spec.symbol,stop.toString()),riskCash:risk.toString()}
  }
  async open(spec:OpenSpec){
+  return lowBudgetGuard.execute({symbol:spec.symbol,direction:spec.direction,units:spec.units,stop:spec.hardStop,referencePrice:spec.referencePrice},async()=>{
   requirePractice()
   const normalizedStop=await this.readOnly.formatPrice(spec.symbol,spec.hardStop)
   const normalizedTarget=spec.target?await this.readOnly.formatPrice(spec.symbol,spec.target):null
@@ -105,6 +107,7 @@ export class OllamaPracticeBroker{
   const id=fill?.tradeOpened?.tradeID||fill?.tradesOpened?.[0]?.tradeID
   if(!id)throw Error('OANDA order returned no confirmed trade-open ID')
   return{tradeId:String(id),fillPrice:String(fill.price||''),transactionId:String(fill.id||'')}
+  })
  }
  private async owned(tradeId:string,clientId:string){
   requirePractice()
