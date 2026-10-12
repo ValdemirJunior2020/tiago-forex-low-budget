@@ -38,6 +38,7 @@ export class ShadowBrokerFirst {
   writeFileSync(tmp,JSON.stringify(this.state,null,2),'utf8');renameSync(tmp,statePath)
  }
  start(){
+  logShadowTrade({event:'SHADOW_ENGINE_STARTED',source:'OANDA_PRACTICE',pairs:SHADOW_OANDA_PAIRS,pollMs:Math.max(10000,env.SHADOW_OANDA_POLL_MS)})
   this.ai.start()
   void this.tick()
   this.timer=setInterval(()=>void this.tick(),Math.max(10000,env.SHADOW_OANDA_POLL_MS))
@@ -116,10 +117,20 @@ export class ShadowBrokerFirst {
  private async scan(symbol:string){
   const [m5,m10,q]=await Promise.all([this.broker.candles(symbol,'M5',60),this.broker.candles(symbol,'M10',40),this.broker.quote(symbol)])
   const last=m5.at(-1)
-  if(!last||this.state.lastCandle[symbol]===last.time)return
+  if(!last){
+   logShadowTrade({event:'SHADOW_CANDLE_UNAVAILABLE',symbol})
+   return
+  }
+  if(this.state.lastCandle[symbol]===last.time)return
   this.state.lastCandle[symbol]=last.time;this.save()
   const context=strategyContext(m5,m10)
   const signal=evaluate(context),candidate=analyzeCandidate(context)
+  logShadowCandidate({
+   event:'SHADOW_SCAN',source:'OANDA_PRACTICE',symbol,candleTime:last.time,
+   strictDecision:signal.decision,candidateSide:candidate.side??null,
+   missing:candidate.missing??null,
+   status:this.state.blockedReason?'REVIEW_REQUIRED':this.state.position?'BROKER_OPEN':candidate.side?'CANDIDATE':'WAITING_FOR_SETUP'
+  })
   // Same original Shadow 3/4 gate: three matching conditions while strict signal waits.
   if(signal.decision!=='WAIT'||!candidate.side)return
   this.state.candidateCount++
@@ -152,6 +163,7 @@ export class ShadowBrokerFirst {
   if(this.busy)return
   this.busy=true
   try{
+   logShadowTrade({event:'SHADOW_HEARTBEAT',source:'OANDA_PRACTICE',pairs:SHADOW_OANDA_PAIRS,blockedReason:this.state.blockedReason??null,tradeId:this.state.position?.tradeId??null})
    if(this.state.blockedReason)return
    const a=await this.broker.account()
    this.risk.recordEquity(a.equity)
