@@ -22,7 +22,7 @@ Dashboard: http://127.0.0.1:5174
 Backend: http://127.0.0.1:8791
 Original remains 5173/8790.
 
-Place the provided picture at client/public/logo.png (create that folder if needed).
+Place your local images at `client/public/logo.jpeg` and `client/public/loader.gif`. The frontend reads them directly; the GIF appears while the app checks its API, rather than pretending an order is being executed.
 
 ## Verification
 Run npm install and npm run verify. GitHub Actions runs the same tests. Broker orders cannot be tested by CI without the user's private local OANDA credentials.
