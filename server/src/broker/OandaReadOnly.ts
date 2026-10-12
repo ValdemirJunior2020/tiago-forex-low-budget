@@ -1,3 +1,5 @@
+import {randomUUID} from 'node:crypto'
+import {lowBudgetGuard,SHADOW_TAG} from '../risk/LowBudgetGuard.js'
 import{Decimal}from'decimal.js'
 import type{AccountState,BrokerQuote}from'../types.js'
 import{env}from'../config.js'
@@ -81,32 +83,33 @@ export class OandaReadOnly{
    notionalUsd:notionalUsd.toFixed(2)
   }
  }
- async openPracticeTrade(symbol:string,direction:'long'|'short',units:string,hardStop:string){
-  const qty=new Decimal(units).abs()
-  if(qty.lte(0))throw new Error('Demo order blocked: units must be positive')
-  const signedUnits=(direction==='long'?qty:qty.neg()).toFixed(0)
-  const normalizedStop=await this.formatPrice(symbol,hardStop)
-  const b=await this.write(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/orders`,'POST',{
-   order:{
-    type:'MARKET',
-    instrument:symbol,
-    units:signedUnits,
-    timeInForce:'FOK',
-    positionFill:'OPEN_ONLY',
-    stopLossOnFill:{price:normalizedStop,timeInForce:'GTC'}
+ async openPracticeTrade(symbol:string,direction:'long'|'short',units:string,hardStop:string,referencePrice?:string){
+  const reference=referencePrice||String(direction==='long'?(await this.quote(symbol)).ask:(await this.quote(symbol)).bid)
+  return lowBudgetGuard.execute({symbol,direction,units,stop:hardStop,referencePrice:reference},async()=>{
+   const qty=new Decimal(units)
+   if(!qty.isInteger()||qty.lte(0))throw Error('Invalid Practice units')
+   const signed=(direction==='long'?qty:qty.neg()).toFixed(0)
+   const stop=await this.formatPrice(symbol,hardStop)
+   const bound=new Decimal(reference).mul(direction==='long'?'1.001':'.999')
+   const clientId='FP_SH_'+randomUUID().replace(/-/g,'').slice(0,24)
+   const order={
+    type:'MARKET',instrument:symbol,units:signed,timeInForce:'FOK',
+    positionFill:'OPEN_ONLY',priceBound:await this.formatPrice(symbol,bound.toString()),
+    stopLossOnFill:{price:stop,timeInForce:'GTC'},
+    clientExtensions:{id:clientId+'_order',tag:SHADOW_TAG},
+    tradeClientExtensions:{id:clientId,tag:SHADOW_TAG}
    }
+   const b=await this.write('/v3/accounts/'+encodeURIComponent(env.OANDA_ACCOUNT_ID)+'/orders','POST',{order})
+   const fill=b.orderFillTransaction
+   const tradeId=fill?.tradeOpened?.tradeID||fill?.tradesOpened?.[0]?.tradeID
+   if(!tradeId)throw Error('OANDA did not confirm Shadow Trade ID; reconcile with broker before retrying')
+   return{tradeId:String(tradeId),fillPrice:String(fill.price||''),stopPrice:stop,transactionId:String(fill.id||'')}
   })
-  const fill=b?.orderFillTransaction
-  const tradeId=fill?.tradeOpened?.tradeID||fill?.tradesOpened?.[0]?.tradeID
-  if(!tradeId)throw new Error('Demo order was not confirmed as an opened trade')
-  return{
-   tradeId:String(tradeId),
-   fillPrice:String(fill?.price||''),
-   stopPrice:normalizedStop,
-   transactionId:String(fill?.id||b?.lastTransactionID||'')
-  }
  }
  async updatePracticeStopLoss(tradeId:string,symbol:string,price:string){
+  lowBudgetGuard.assertIdentity()
+  const own=await this.trade(tradeId)
+  if(!own||own.clientExtensions?.tag!==SHADOW_TAG||own.instrument!==symbol||own.state!=='OPEN')throw Error('SHADOW_TRADE_OWNERSHIP_MISMATCH')
   const normalizedStop=await this.formatPrice(symbol,price)
   const b=await this.write(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades/${encodeURIComponent(tradeId)}/orders`,'PUT',{
    stopLoss:{price:normalizedStop,timeInForce:'GTC'}
@@ -114,6 +117,9 @@ export class OandaReadOnly{
   return{tradeId,price:normalizedStop,lastTransactionID:String(b?.lastTransactionID||'')}
  }
  async closePracticeTrade(tradeId:string){
+  lowBudgetGuard.assertIdentity()
+  const own=await this.trade(tradeId)
+  if(!own||own.clientExtensions?.tag!==SHADOW_TAG||own.state!=='OPEN')throw Error('SHADOW_TRADE_OWNERSHIP_MISMATCH')
   const b=await this.write(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades/${encodeURIComponent(tradeId)}/close`,'PUT',{units:'ALL'})
   const fill=b?.orderFillTransaction
   return{
