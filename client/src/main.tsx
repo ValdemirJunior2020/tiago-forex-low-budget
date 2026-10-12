@@ -169,7 +169,15 @@ function App(){
         <div><span className={health?.ollama?'signal good':'signal bad'}><BrainCircuit size={15}/></span><small>{x.ollama}</small><b>{health?.ollama?x.online:x.offline}</b></div>
         <div><span className={account?.locked?'signal bad':'signal good'}><ShieldCheck size={15}/></span><small>{x.riskState}</small><b>{account?.locked?x.locked:x.protected}</b></div>
         <div className="fp-activity" role="status" aria-live="off">
-          {(health?.broker || health?.ollama) && <div className="fp-loader-viewport"><img className="fp-loader" src="/loader.gif" alt="" aria-hidden="true" onError={e=>{e.currentTarget.style.display='none'}}/></div>}
+          <div className={health?.broker?'fp-candle-screen fp-candle-running':'fp-candle-screen fp-candle-idle'} aria-hidden="true">
+            <div className="fp-candle-grid"/>
+            <div className="fp-candle-series">
+              <span className="fp-candle fp-bull"/><span className="fp-candle fp-bear"/>
+              <span className="fp-candle fp-bull"/><span className="fp-candle fp-bull"/>
+              <span className="fp-candle fp-bear"/><span className="fp-candle fp-bull"/>
+            </div>
+            <span className="fp-candle-scan"/>
+          </div>
           <span className={loading?'fp-activity-dot fp-activity-dot-active':'fp-activity-dot'} aria-hidden="true"/>
           <div className="fp-activity-copy">
             <small>{lang==='pt'?'ATIVIDADE DO BOT':'BOT ACTIVITY'}</small>
