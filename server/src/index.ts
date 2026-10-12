@@ -5,12 +5,13 @@ import{OandaReadOnly}from'./broker/OandaReadOnly.js'
 import{RiskManager}from'./risk/RiskManager.js'
 import{ollamaHealth,critique}from'./ollama.js'
 import{env,BROKER_MODE,OANDA_DEMO_MIRROR_ENABLED}from'./config.js'
-import{ShadowOandaEngine}from'./simulator/ShadowOandaEngine.js'
-import{OllamaPracticeMirror}from'./simulator/OllamaPracticeMirror.js'
+import{ShadowBrokerFirst}from'./engines/ShadowBrokerFirst.js'
+import{OllamaPracticeMirror}from'./engines/OllamaPracticeMirror.js'
 import{isTagged}from'./broker/OllamaPracticeBroker.js'
-import{purgeLegacyResearch}from'./maintenance/RemoveLegacyResearch.js'
+import{lowBudgetGuard}from'./risk/LowBudgetGuard.js'
+import{Decimal}from'decimal.js'
 
-const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowOandaEngine(broker),
+const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowBrokerFirst(broker),
  ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot())
 
 app.use(helmet())
@@ -37,6 +38,15 @@ app.get('/health',async(_q,res)=>{
   })
 })
 
+app.get('/api/low-budget',async(_q,res)=>{
+ try{const v=await lowBudgetGuard.snapshot()
+ res.json({source:v.source,budgetUsd:1000,brokerBalance:v.account.balance,
+ brokerEquity:v.account.NAV??null,openTrades:v.trades.length,
+ marginUsed:v.account.marginUsed??null,marginAvailable:v.account.marginAvailable??null,
+ tradingEnabled:env.LOW_BUDGET_TRADING_ENABLED==='true',maxRiskPerTradeUsd:2.5,
+ maxSharedStopRiskUsd:5,maxSharedMarginUsd:200,maxNotionalUsd:10000})}
+ catch(e){res.status(503).json({source:'OANDA_API',status:'UNAVAILABLE',error:String(e)})}
+})
 app.get('/api/account',async(_q,res)=>{
   try{
     const a=await broker.account()
@@ -94,7 +104,7 @@ app.post('/api/plan',async(req,res)=>{
     const q=await broker.quote(req.body.symbol)
     const direction=req.body.direction==='short'?'short':'long'
     const price=direction==='long'?q.ask:q.bid
-    const plan=risk.plan(req.body.symbol,direction,price,a.equity,req.body.reasons||[])
+    const plan=risk.plan(req.body.symbol,direction,price,Decimal.min(1000,new Decimal(a.equity)).toString(),req.body.reasons||[])
     const margin=await broker.marginMetrics(req.body.symbol,price,plan.units,a.marginAvailable)
     const ai=await critique({plan,margin,quote:q}).catch(()=>({decision:'NEUTRAL',reason:'Ollama unavailable'}))
     res.json({plan:{...plan,...margin},ai,manualExecutionRequired:true})
@@ -120,11 +130,7 @@ app.post('/api/validate-fill',(req,res)=>{
 })
 
 app.listen(env.PORT,'127.0.0.1',()=>{
- console.log(`ProfitMind Forex OANDA Practice http://127.0.0.1:${env.PORT}`)
- try{
-  const cleanup=purgeLegacyResearch()
-  console.log('[BROKER_ONLY_CLEANUP]',JSON.stringify(cleanup))
- }catch(e){console.error('[BROKER_ONLY_CLEANUP_ERROR]',String(e))}
+ console.log(`Forex-Pobre OANDA Practice http://127.0.0.1:${env.PORT}`)
  engine.start()
  ollamaMirror.start()
 })
