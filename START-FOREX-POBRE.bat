@@ -50,7 +50,7 @@ if not errorlevel 1 (
  if errorlevel 1 start "" /min ollama serve
 )
 echo Abrindo painel Forex-Pobre...
-start "Forex-Pobre Frontend 24-7" /min cmd /c ""%~dp0RUN-FOREX-POBRE-FRONTEND.bat""
+start "Forex-Pobre Frontend 24-7" /min "%~dp0RUN-FOREX-POBRE-FRONTEND.bat"
 timeout /t 3 /nobreak >nul
 set "CHROME="
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
