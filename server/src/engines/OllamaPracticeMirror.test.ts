@@ -1,4 +1,5 @@
-import{describe,it,expect,afterEach}from'vitest'
+import{describe,it,expect,afterEach,beforeEach}from'vitest'
+import{env}from'../config.js'
 import{mkdtempSync,rmSync}from'node:fs'
 import{tmpdir}from'node:os'
 import{join}from'node:path'
@@ -6,6 +7,8 @@ import{OllamaPracticeMirror}from'./OllamaPracticeMirror.js'
 import type{BrokerSignal}from'./OllamaSignalEngine.js'
 import{OLLAMA_TRADE_TAG,isTagged,ollamaClientId}from'../broker/OllamaPracticeBroker.js'
 
+const initialMirrorEnabled=env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED
+beforeEach(()=>{env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED='true'})
 const dirs:string[]=[]
 const now=()=>new Date('2026-10-09T19:30:00.000Z') // Friday 15:30 EDT, session open
 let sequence=0
@@ -46,7 +49,7 @@ function harness(existing:BrokerSignal|null=null){
   setShadow:(s:string|null)=>{shadow={position:s?{symbol:s}:null}},
   setOldPaper:()=>{view={lastBrokerSignal:null,position:{symbol:'EUR_USD',openedAt:now().toISOString()}}}}
 }
-afterEach(()=>{for(const dir of dirs.splice(0))rmSync(dir,{recursive:true,force:true})})
+afterEach(()=>{env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED=initialMirrorEnabled;for(const dir of dirs.splice(0))rmSync(dir,{recursive:true,force:true})})
 describe('Ollama OANDA Practice direct execution, no virtual mirroring',()=>{
  it('does not execute a signal already present at startup',async()=>{
   const h=harness(signal())
