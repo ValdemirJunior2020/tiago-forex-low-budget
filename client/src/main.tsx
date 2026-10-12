@@ -169,7 +169,7 @@ function App(){
         <div><span className={health?.ollama?'signal good':'signal bad'}><BrainCircuit size={15}/></span><small>{x.ollama}</small><b>{health?.ollama?x.online:x.offline}</b></div>
         <div><span className={account?.locked?'signal bad':'signal good'}><ShieldCheck size={15}/></span><small>{x.riskState}</small><b>{account?.locked?x.locked:x.protected}</b></div>
         <div className="fp-activity" role="status" aria-live="off">
-          {loading && <img className="fp-loader" src="/loader.gif" alt="" aria-hidden="true" onError={e=>{e.currentTarget.style.display='none'}}/>}
+          {(health?.broker || health?.ollama) && <img className="fp-loader" src="/loader.gif" alt="" aria-hidden="true" onError={e=>{e.currentTarget.style.display='none'}}/>}
           <span className={loading?'fp-activity-dot fp-activity-dot-active':'fp-activity-dot'} aria-hidden="true"/>
           <div className="fp-activity-copy">
             <small>{lang==='pt'?'ATIVIDADE DO BOT':'BOT ACTIVITY'}</small>
