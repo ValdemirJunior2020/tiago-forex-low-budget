@@ -112,7 +112,7 @@ function App(){
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand-mini">
-        <img src="/logo.png" alt="Forex-Pobre" onError={e=>{e.currentTarget.style.display='none'}}/>
+        <img src="/logo.jpeg" alt="Forex-Pobre" onError={e=>{e.currentTarget.style.display='none'}}/>
         <div><strong>Forex-Pobre</strong><span>OANDA LOW BUDGET</span></div>
       </div>
 
@@ -149,7 +149,7 @@ function App(){
     <main className="content">
       <header className="topbar">
         <div className="hero-brand">
-          <div className="logo-frame"><img src="/logo.png" alt="Forex-Pobre" onError={e=>{e.currentTarget.style.display='none'}}/></div>
+          <div className="logo-frame"><img src="/logo.jpeg" alt="Forex-Pobre" onError={e=>{e.currentTarget.style.display='none'}}/></div>
           <div>
             <div className="eyebrow"><Sparkles size={14}/> FOREX-POBRE • CAPITAL PROTEGIDO</div>
             <h1>Forex <span>Pobre</span></h1>
@@ -168,6 +168,14 @@ function App(){
         <div><span className={health?.broker?'signal good':'signal bad'}>{health?.broker?<Wifi size={15}/>:<WifiOff size={15}/>}</span><small>{x.broker}</small><b>{health?.broker?x.online:x.offline}</b></div>
         <div><span className={health?.ollama?'signal good':'signal bad'}><BrainCircuit size={15}/></span><small>{x.ollama}</small><b>{health?.ollama?x.online:x.offline}</b></div>
         <div><span className={account?.locked?'signal bad':'signal good'}><ShieldCheck size={15}/></span><small>{x.riskState}</small><b>{account?.locked?x.locked:x.protected}</b></div>
+        <div className="fp-activity" role="status" aria-live="off">
+          {loading && <img className="fp-loader" src="/loader.gif" alt="" aria-hidden="true" onError={e=>{e.currentTarget.style.display='none'}}/>}
+          <span className={loading?'fp-activity-dot fp-activity-dot-active':'fp-activity-dot'} aria-hidden="true"/>
+          <div className="fp-activity-copy">
+            <small>{lang==='pt'?'ATIVIDADE DO BOT':'BOT ACTIVITY'}</small>
+            <b>{loading?(lang==='pt'?'Consultando OANDA…':'Checking OANDA…'):!health?.broker?(lang==='pt'?'Aguardando conexão':'Waiting for connection'):budgetInfo?.tradingEnabled?(lang==='pt'?'Monitorando mercado':'Monitoring market'):(lang==='pt'?'Monitoramento sem ordens':'Monitoring only')}</b>
+          </div>
+        </div>
         <div className="strip-note">{x.updated}</div>
       </section>
 
