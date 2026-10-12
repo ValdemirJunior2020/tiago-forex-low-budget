@@ -8,13 +8,15 @@ const here = dirname(fileURLToPath(import.meta.url))
 loadEnv({ path: resolve(here, '../../.env') })
 
 const s = z.object({
-  PORT: z.coerce.number().default(8790),
-  CLIENT_ORIGIN: z.string().default('http://127.0.0.1:5173'),
+  PORT: z.coerce.number().default(8791),
+  CLIENT_ORIGIN: z.string().default('http://127.0.0.1:5174'),
   OANDA_ACCOUNT_ID: z.string().default(''),
+  LOW_BUDGET_ALLOWED_ACCOUNT_ID: z.string().default(''),
+  LOW_BUDGET_TRADING_ENABLED: z.string().default('false'),
   OANDA_API_TOKEN: z.string().default(''),
   OANDA_REST_BASE_URL: z.string().default('https://api-fxpractice.oanda.com'),
-  OANDA_DEMO_MIRROR_ENABLED: z.string().default('true'),
-  OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED: z.string().default('true'),
+  OANDA_DEMO_MIRROR_ENABLED: z.string().default('false'),
+  OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED: z.string().default('false'),
   OLLAMA_BASE_URL: z.string().default('http://127.0.0.1:11434'),
   OLLAMA_MODEL: z.string().default('qwen3:8b'),
   OLLAMA_TIMEOUT_MS: z.coerce.number().default(2000),
@@ -32,9 +34,12 @@ export const LIMITS = Object.freeze({
 })
 
 export const BROKER_MODE = env.OANDA_REST_BASE_URL.replace(/\/$/,'')==='https://api-fxpractice.oanda.com' ? 'DEMO' : 'DISABLED'
-export const OANDA_DEMO_MIRROR_ENABLED = env.OANDA_DEMO_MIRROR_ENABLED.toLowerCase()==='true' && BROKER_MODE==='DEMO'
+export const OANDA_DEMO_MIRROR_ENABLED = env.LOW_BUDGET_TRADING_ENABLED==='true' && env.OANDA_DEMO_MIRROR_ENABLED.toLowerCase()==='true' && BROKER_MODE==='DEMO'
 
 export const SHADOW_OANDA_PAIRS = env.TRADE_PAIRS.split(',').map(x=>x.trim()).filter(Boolean)
 
 // Do not initialize this service against OANDA Live without a separate, explicit implementation.
 if(BROKER_MODE!=='DEMO')throw new Error('Only OANDA Practice is supported; LIVE endpoint is disabled')
+
+// Never accept a different account once the user pins the NEW Practice account in local .env.
+if(env.OANDA_ACCOUNT_ID && env.LOW_BUDGET_ALLOWED_ACCOUNT_ID && env.OANDA_ACCOUNT_ID!==env.LOW_BUDGET_ALLOWED_ACCOUNT_ID)throw new Error('Wrong Low Budget account; execution refused')
