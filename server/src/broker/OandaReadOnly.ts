@@ -156,7 +156,7 @@ export class OandaReadOnly{
   const limit=Math.max(1,Math.min(250,Math.floor(count)))
   const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades?state=CLOSED&count=${limit}`)
   if(!Array.isArray(b.trades))throw new Error('OANDA closed trades payload unavailable')
-  return b.trades as Array<{id:string;instrument:string;state:string;initialUnits:string;openTime:string;closeTime:string;realizedPL:string;price?:string;averageClosePrice?:string;stopLossOrder?:{price?:string};takeProfitOrder?:{price?:string}}>
+  return b.trades as Array<{id:string;instrument:string;state:string;initialUnits:string;openTime:string;closeTime:string;realizedPL:string;clientExtensions?:{tag?:string;id?:string};price?:string;averageClosePrice?:string;stopLossOrder?:{price?:string};takeProfitOrder?:{price?:string}}>
  }
  // Historical midpoint candles are observations, NEVER executed fill prices.
  // Reject candles that were not completed by the requested cutoff (prevent look-ahead).
