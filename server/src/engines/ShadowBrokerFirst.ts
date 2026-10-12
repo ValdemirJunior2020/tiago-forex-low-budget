@@ -43,7 +43,7 @@ export class ShadowBrokerFirst {
   this.timer=setInterval(()=>void this.tick(),Math.max(10000,env.SHADOW_OANDA_POLL_MS))
  }
  stop(){if(this.timer)clearInterval(this.timer);this.timer=null}
- shadowSnapshot(){return {position:this.state.position?{symbol:this.state.position.symbol,brokerMirrorTradeId:this.state.position.tradeId}:null,pendingMirrorCloseTradeId:null}}
+ shadowSnapshot(){return {position:this.state.position?{symbol:this.state.position.symbol,brokerMirrorTradeId:this.state.position.tradeId,units:this.state.position.units,direction:this.state.position.direction,hardStop:this.state.position.stop}:null,pendingMirrorCloseTradeId:null}}
  ollamaSnapshot(){return {lastBrokerSignal:this.ai.snapshot().lastBrokerSignal??null}}
  snapshot(){
   const a=this.ai.snapshot()
