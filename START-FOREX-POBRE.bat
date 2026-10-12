@@ -5,7 +5,7 @@ if /I "%~1"=="--frontend-watch" goto frontend_watch
 title Forex-Pobre - ONE CLICK - OANDA Practice
 if not exist "logs" mkdir "logs"
 echo [FOREX-POBRE] Setup, build, Chrome e monitoramento em um BAT.
-echo Tiago original: 5173/8790. Forex-Pobre: 5174/8791.
+echo Forex-Pobre: Chrome 5174 / API 8791.
 where node >nul 2>nul
 if errorlevel 1 goto missing_node
 where npm >nul 2>nul
