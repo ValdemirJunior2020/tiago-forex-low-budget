@@ -716,3 +716,14 @@ body{background:radial-gradient(circle at 45% -10%,rgba(104,212,231,.14),transpa
 .ollama-strategy-card,.ollama-oanda-official{border-color:rgba(255,149,194,.38)}
 @media(max-width:900px){.fp-budget-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.forex-pobre-budget{padding:17px}.fp-budget-stats{grid-template-columns:1fr 1fr}.fp-budget-stats>div{padding:10px}.fp-budget-title strong{width:100%}}
+
+
+/* Forex-Pobre local visual activity; only the API polling cycle shows the GIF. */
+.fp-activity{display:flex;align-items:center;gap:9px;margin-left:auto;min-width:168px;max-width:250px}
+.fp-loader{width:28px;height:28px;object-fit:contain;flex-shrink:0;border-radius:7px}
+.fp-activity-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#658299}
+.fp-activity-dot-active{background:#7fe8c8;box-shadow:0 0 0 4px rgba(127,232,200,.1)}
+.fp-activity-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fp-activity-copy small{font-size:9px;letter-spacing:.08em;color:#a8bed6}
+.fp-activity-copy b{font-size:11px;line-height:1.25;color:#eafbf9}
+@media (max-width:880px){.fp-activity{min-width:120px;max-width:190px}}
