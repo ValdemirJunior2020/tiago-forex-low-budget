@@ -63,6 +63,25 @@ describe('OANDA read-only outcome attribution',()=>{
   expect(r.lessonsFor('EUR_USD')).toEqual([])
   expect(r.completedSince('2026-10-09T00:00:00Z')).toHaveLength(1)
  })
+ it('remembers verified tagged low-budget Shadow wins and losses across restarts',async()=>{
+  const dir=mkdtempSync(join(tmpdir(),'forex-pobre-lessons-test-'));dirs.push(dir)
+  const log=join(dir,'shadow.jsonl'),store=join(dir,'lessons.json')
+  const owned={...trade('83','7.25'),clientExtensions:{tag:'FOREX_POBRE_SHADOW'}}
+  const other=trade('84','999.00')
+  const broker={closedTrades:async()=>[owned,other],
+   candlesBefore:async()=>bars(50,5),candlesDuring:async()=>bars(85,5)}
+  const first=new OandaOutcomeResearch(broker as any,{mirrorLogFile:log,lessonStoreFile:store})
+  await first.refresh()
+  expect(first.snapshot().summary.trades).toBe(1)
+  expect(first.snapshot().summary.netPL).toBe(7.25)
+  expect(first.snapshot().chartCoverage).toBe(1)
+  const rebooted=new OandaOutcomeResearch(broker as any,{mirrorLogFile:log,lessonStoreFile:store})
+  expect(rebooted.snapshot().summary.trades).toBe(1)
+  expect(rebooted.snapshot().chartCoverage).toBe(1)
+  expect(rebooted.snapshot().status).toBe('WAITING')
+  await rebooted.refresh()
+  expect(rebooted.snapshot().summary.netPL).toBe(7.25)
+ })
  it('picks a bounded timeframe for the complete trade history rather than inventing a long M1 path',()=>{
   const at='2026-10-08T00:00:00.000Z'
   const later=(m:number)=>new Date(Date.parse(at)+m*60000).toISOString()
