@@ -31,13 +31,21 @@ if errorlevel 1 goto failed
 call npm run verify
 if errorlevel 1 goto failed
 
-netstat -ano | findstr ":8791" | findstr "LISTENING" >nul
+netstat -ano | findstr /R /C:":8791 .*LISTENING" >nul
 if not errorlevel 1 (
- echo [PARADO] Porta 8791 ocupada; nao iniciaremos um segundo backend.
- pause
- exit /b 1
+ echo [INFO] Porta 8791 ja esta em uso. Conferindo se e o Forex-Pobre...
+ powershell -NoProfile -Command "try { $r=Invoke-RestMethod -Uri 'http://127.0.0.1:8791/api/low-budget' -TimeoutSec 5 -ErrorAction Stop; if($r.source -eq 'OANDA_API' -and $r.budgetUsd -eq 1000){exit 0}else{exit 1} } catch {exit 1}"
+ if errorlevel 1 (
+  echo [PARADO] Porta 8791 ocupada por servico nao verificado.
+  echo [SEGURANCA] Nao interrompemos processos e nao iniciamos outro bot.
+  echo Confira o processo antes de tentar novamente.
+  pause
+  exit /b 1
+ )
+ echo [OK] Forex-Pobre ja esta rodando. Nenhum segundo backend sera iniciado.
+ goto open_chrome
 )
-netstat -ano | findstr ":5174" | findstr "LISTENING" >nul
+netstat -ano | findstr /R /C:":5174 .*LISTENING" >nul
 if not errorlevel 1 (
  echo [PARADO] Porta 5174 ocupada; confira os processos antes de iniciar.
  pause
@@ -52,6 +60,7 @@ if not errorlevel 1 (
 echo Abrindo painel Forex-Pobre...
 start "Forex-Pobre Frontend 24-7" /min "%~dp0RUN-FOREX-POBRE-FRONTEND.bat"
 timeout /t 3 /nobreak >nul
+:open_chrome
 set "CHROME="
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
 if not defined CHROME if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
