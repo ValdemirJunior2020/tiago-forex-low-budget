@@ -161,9 +161,23 @@ export class OllamaSignalEngine{
   this.log(event,fields,trade)
   this.save()
  }
- private validQuote(symbol:string,q:BrokerQuote){
+ private inspectQuote(symbol:string,q:BrokerQuote){
   const bid=Number(q.bid),ask=Number(q.ask),qt=Date.parse(q.timestamp)
-  return q.symbol===symbol&&Number.isFinite(qt)&&Math.abs(this.now().getTime()-qt)<=120000&&Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0&&ask>bid&&(ask-bid)/bid<=MAX_SPREAD_PCT.toNumber()&&(ask-bid)/0.0001<=MAX_SPREAD_PIPS
+  const ageMs=Number.isFinite(qt)?this.now().getTime()-qt:null
+  const spreadPct=Number.isFinite(bid)&&Number.isFinite(ask)&&bid>0?(ask-bid)/bid:null
+  const spreadPips=Number.isFinite(bid)&&Number.isFinite(ask)?(ask-bid)/0.0001:null
+  const reasons:string[]=[]
+  if(q.symbol!==symbol)reasons.push('SYMBOL_MISMATCH')
+  if(ageMs===null)reasons.push('INVALID_TIMESTAMP')
+  else if(Math.abs(ageMs)>120000)reasons.push('STALE_QUOTE')
+  if(!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<=bid)reasons.push('INVALID_BID_ASK')
+  if(spreadPct!==null&&spreadPct>MAX_SPREAD_PCT.toNumber())reasons.push('SPREAD_PERCENT_EXCEEDED')
+  if(spreadPips!==null&&spreadPips>MAX_SPREAD_PIPS)reasons.push('SPREAD_PIPS_EXCEEDED')
+  return {valid:reasons.length===0,reasons,quoteSymbol:q.symbol,quoteTime:q.timestamp,
+   ageMs,bid:Number.isFinite(bid)?bid:null,ask:Number.isFinite(ask)?ask:null,
+   spreadPips:spreadPips!==null&&Number.isFinite(spreadPips)?Number(spreadPips.toFixed(3)):null,
+   spreadPct:spreadPct!==null&&Number.isFinite(spreadPct)?Number((spreadPct*100).toFixed(5)):null,
+   limits:{maxAgeMs:120000,maxSpreadPips:MAX_SPREAD_PIPS,maxSpreadPct:Number(MAX_SPREAD_PCT.mul(100).toString())}}
  }
  private createBrokerSignal(symbol:string,direction:Direction,q:BrokerQuote,m5:Candle[],decision:AiDecision,candleTime:string):BrokerSignal{
   const entry=new Decimal(direction==='long'?q.ask:q.bid)
@@ -196,7 +210,11 @@ export class OllamaSignalEngine{
     return
    }
    const q=await this.broker.quote(symbol)
-   if(!this.validQuote(symbol,q)){this.record('OLLAMA_LAB_SKIP',{symbol,reason:'Stale, malformed or wide-spread quote'});return}
+   const quoteCheck=this.inspectQuote(symbol,q)
+   if(!quoteCheck.valid){
+    this.record('OLLAMA_LAB_SKIP',{symbol,reason:quoteCheck.reasons.join(', '),quoteDiagnostic:quoteCheck})
+    return
+   }
    // Research is isolated and read-only: failures never become Shadow decisions.
    if(this.research)void this.research.refresh().catch(()=>{})
    const [m5,m10]=await Promise.all([this.broker.candles(symbol,'M5',40),this.broker.candles(symbol,'M10',25)])
