@@ -1,10 +1,14 @@
 import {Decimal as D} from 'decimal.js'
 import {env} from '../config.js'
+import {RiskManager} from './RiskManager.js'
+import {resolve,dirname} from 'node:path'
+import {fileURLToPath} from 'node:url'
 type Spec={symbol:string;direction:'long'|'short';units:string;stop:string;referencePrice:string}
 export const SHADOW_TAG='FOREX_POBRE_SHADOW'
 export const OLLAMA_TAG='FOREX_POBRE_OLLAMA'
 export class LowBudgetGuard {
  private tail:Promise<void>=Promise.resolve()
+ private risk=new RiskManager(resolve(dirname(fileURLToPath(import.meta.url)),'../../../data/low-budget-broker-equity.json'))
  private ensure(){
   if(!env.OANDA_API_TOKEN||!env.OANDA_ACCOUNT_ID||!env.LOW_BUDGET_ALLOWED_ACCOUNT_ID||env.OANDA_ACCOUNT_ID!==env.LOW_BUDGET_ALLOWED_ACCOUNT_ID)throw Error('LOW_BUDGET_ACCOUNT_NOT_VERIFIED')
   if(env.OANDA_REST_BASE_URL.replace(/\/$/,'')!=='https://api-fxpractice.oanda.com')throw Error('PRACTICE_ONLY')
@@ -54,7 +58,10 @@ export class LowBudgetGuard {
   if(!rate.isFinite()||rate.lte(0))throw Error('MARGIN_RATE_UNAVAILABLE')
   const required=u.mul(price).mul(rate)
   if(new D(account.marginUsed||'0').plus(required).gt('200')||new D(account.marginAvailable||'0').lt(required.mul(2)))throw Error('SHARED_MARGIN_LIMIT_200')
-  if(new D(account.NAV||account.balance).lte(0))throw Error('INVALID_BROKER_EQUITY')
+  const equity=new D(account.NAV||account.balance)
+  if(!equity.isFinite()||equity.lte(0))throw Error('INVALID_BROKER_EQUITY')
+  this.risk.recordEquity(equity.toString())
+  if(this.risk.locked())throw Error('OANDA_24H_DRAWDOWN_3_PERCENT_LOCK')
  }
  async execute<T>(s:Spec,fn:()=>Promise<T>):Promise<T>{
   let release!:()=>void
