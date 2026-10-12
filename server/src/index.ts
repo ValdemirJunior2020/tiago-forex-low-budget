@@ -125,7 +125,7 @@ app.get('/api/shadow-results',async(_q,res)=>{
  }catch(e){res.status(503).json({source:'OANDA_API',status:'UNAVAILABLE',error:String(e)})}
 })
 
-app.get('/api/engine',(_q,res)=>res.json({source:'OANDA_PRACTICE_ENGINE',...engine.snapshot()}))
+app.get('/api/engine',(_q,res)=>res.json({...engine.snapshot(),source:'OANDA_PRACTICE_ENGINE'}))
 
 // Independent broker-verified Ollama results. This endpoint NEVER submits orders.
 app.get('/api/ollama-mirror',(_q,res)=>res.json(ollamaMirror.snapshot()))
