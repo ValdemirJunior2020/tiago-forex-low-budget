@@ -34,6 +34,20 @@ export class OpenVikingBridge {
    }finally{clearTimeout(timer)}
   }catch{return {...this.snapshot(),reachable:false}}
  }
+ async recall(symbol:string):Promise<string[]>{
+  if(!this.enabled||!env.OANDA_ACCOUNT_ID||!['EUR_USD','GBP_USD'].includes(symbol))return []
+  try{
+   const result:any=await this.post('/api/v1/search/find',{
+    query:symbol+' Forex-Pobre OANDA confirmed trade result win loss indicators',
+    target_uri:'viking://resources/forex-pobre-'+this.accountKey,
+    limit:3
+   })
+   const data=result.result??result
+   const hits=Array.isArray(data.resources)?data.resources:Array.isArray(data.hits)?data.hits:[]
+   return hits.slice(0,3).map((v:any)=>String(v.abstract||v.overview||v.snippet||'').slice(0,300))
+    .filter((s:string)=>s.length>0)
+  }catch(e){this.lastError='OpenViking recall unavailable: '+String(e);return []}
+ }
  async syncLessons(lessons:VerifiedLesson[]){
   if(!this.enabled||this.busy||!env.OANDA_ACCOUNT_ID)return
   this.busy=true
