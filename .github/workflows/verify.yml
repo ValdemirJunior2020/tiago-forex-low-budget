@@ -1,4 +1,4 @@
-name: Forex-Pobre Build and Tests
+name: Forex-Pobre Verify (OANDA-first)
 on:
   push:
   pull_request:
@@ -10,5 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install
-      - run: npm run verify
+      - name: Install dependencies
+        run: npm install
+      - name: Typecheck, build and unit tests
+        run: npm run verify

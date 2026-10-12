@@ -1,0 +1,11 @@
+# Secrets and OANDA data must never be committed
+.env
+.env.*
+!.env.example
+**/node_modules/
+**/dist/
+data/
+logs/
+*.log
+*.tmp
+.DS_Store

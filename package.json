@@ -1,0 +1,17 @@
+{
+  "name": "forex-pobre-low-budget",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "postinstall": "cd server && npm install --workspaces=false && cd ../client && npm install --workspaces=false",
+    "dev": "concurrently -n server,client -c auto \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "cd server && npm run build && cd ../client && npm run build",
+    "test": "cd server && npm test",
+    "verify": "npm run build && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

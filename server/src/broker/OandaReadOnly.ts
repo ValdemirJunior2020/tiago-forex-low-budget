@@ -1,0 +1,204 @@
+import {randomUUID} from 'node:crypto'
+import {lowBudgetGuard,SHADOW_TAG} from '../risk/LowBudgetGuard.js'
+import{Decimal}from'decimal.js'
+import type{AccountState,BrokerQuote}from'../types.js'
+import{env}from'../config.js'
+export class OandaReadOnly{
+ private headers(){if(!env.OANDA_API_TOKEN||!env.OANDA_ACCOUNT_ID)throw new Error('Broker credentials not configured');return{Authorization:`Bearer ${env.OANDA_API_TOKEN}`}}
+ private assertPracticeWrite(){
+  if(!env.OANDA_REST_BASE_URL.includes('api-fxpractice.oanda.com'))
+   throw new Error('Demo order blocked: OANDA practice endpoint is required')
+ }
+ private async write(path:string,method:'POST'|'PUT',body:unknown){
+  this.assertPracticeWrite()
+  const r=await fetch(`${env.OANDA_REST_BASE_URL}${path}`,{
+   method,
+   headers:{...this.headers(),'Content-Type':'application/json'},
+   body:JSON.stringify(body)
+  })
+  const b:any=await r.json().catch(()=>({}))
+  if(!r.ok){
+   const detail=b?.errorMessage||b?.errorCode||`Broker HTTP ${r.status}`
+   throw new Error(String(detail))
+  }
+  return b
+ }
+ private async get(path:string){
+  const retryable=new Set([503,504])
+  const maxAttempts=4
+  let lastError:unknown=null
+  for(let attempt=1;attempt<=maxAttempts;attempt++){
+   try{
+    const r=await fetch(`${env.OANDA_REST_BASE_URL}${path}`,{headers:this.headers()})
+    const b:any=await r.json().catch(()=>({}))
+    if(r.ok)return b
+    if(!retryable.has(r.status)||attempt===maxAttempts)throw new Error(`Broker HTTP ${r.status}`)
+    lastError=new Error(`Broker HTTP ${r.status}`)
+   }catch(e){
+    lastError=e
+    const msg=e instanceof Error?e.message:String(e)
+    const transientFetchFailure=msg==='fetch failed'||msg.includes('ECONNRESET')||msg.includes('ETIMEDOUT')
+    if((!transientFetchFailure&&!msg.includes('Broker HTTP 503')&&!msg.includes('Broker HTTP 504'))||attempt===maxAttempts)throw e
+   }
+   await new Promise(resolve=>setTimeout(resolve,500*Math.pow(2,attempt-1)))
+  }
+  throw lastError instanceof Error?lastError:new Error('Broker request failed')
+ }
+ async account():Promise<AccountState>{const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/summary`),a=b.account,bal=new Decimal(a.balance);return{balance:bal.toString(),equity:bal.plus(a.unrealizedPL||0).toString(),marginUsed:String(a.marginUsed||'0'),marginAvailable:String(a.marginAvailable||'0')}}
+ async quote(symbol:string):Promise<BrokerQuote>{const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/pricing?instruments=${encodeURIComponent(symbol)}`),p=b.prices?.[0];if(!p)throw new Error('Quote unavailable');const bid=new Decimal(p.bids?.[0]?.price),ask=new Decimal(p.asks?.[0]?.price);return{symbol,bid:bid.toString(),ask:ask.toString(),mid:bid.plus(ask).div(2).toString(),timestamp:String(p.time)}}
+ async positions(){const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/openTrades`);return b.trades||[]}
+ async trade(tradeId:string){const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades/${encodeURIComponent(tradeId)}`);return b.trade||null}
+ async pricePrecision(symbol:string){
+  const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/instruments?instruments=${encodeURIComponent(symbol)}`)
+  const i=b.instruments?.[0]
+  const p=Number(i?.displayPrecision)
+  if(!Number.isInteger(p)||p<0||p>10)throw new Error('Instrument display precision unavailable')
+  return p
+ }
+ async formatPrice(symbol:string,price:string){
+  const precision=await this.pricePrecision(symbol)
+  return new Decimal(price).toFixed(precision)
+ }
+ async marginRate(symbol:string){
+  const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/instruments?instruments=${encodeURIComponent(symbol)}`)
+  const i=b.instruments?.[0]
+  if(!i?.marginRate)throw new Error('Margin rate unavailable')
+  return String(i.marginRate)
+ }
+ async marginMetrics(symbol:string,price:string,units:string,marginAvailable:string){
+  const u=new Decimal(units).abs(),p=new Decimal(price),available=new Decimal(marginAvailable)
+  const rate=new Decimal(await this.marginRate(symbol))
+  let notionalUsd:Decimal
+  if(symbol.endsWith('_USD'))notionalUsd=u.mul(p)
+  else if(symbol.startsWith('USD_'))notionalUsd=u
+  else throw new Error('USD margin conversion is not implemented for this cross pair')
+  const required=notionalUsd.mul(rate)
+  return{
+   marginRequired:required.toFixed(2),
+   marginAvailable:available.toFixed(2),
+   marginAfterTrade:Decimal.max(0,available.minus(required)).toFixed(2),
+   effectiveLeverage:rate.gt(0)?new Decimal(1).div(rate).toDecimalPlaces(2).toString():'0',
+   lotSize:u.div(100000).toDecimalPlaces(5).toString(),
+   marginRate:rate.toString(),
+   notionalUsd:notionalUsd.toFixed(2)
+  }
+ }
+ async openPracticeTrade(symbol:string,direction:'long'|'short',units:string,hardStop:string,referencePrice?:string){
+  const reference=referencePrice||String(direction==='long'?(await this.quote(symbol)).ask:(await this.quote(symbol)).bid)
+  return lowBudgetGuard.execute({symbol,direction,units,stop:hardStop,referencePrice:reference},async()=>{
+   const qty=new Decimal(units)
+   if(!qty.isInteger()||qty.lte(0))throw Error('Invalid Practice units')
+   const signed=(direction==='long'?qty:qty.neg()).toFixed(0)
+   const stop=await this.formatPrice(symbol,hardStop)
+   const bound=new Decimal(reference).mul(direction==='long'?'1.001':'.999')
+   const clientId='FP_SH_'+randomUUID().replace(/-/g,'').slice(0,24)
+   const order={
+    type:'MARKET',instrument:symbol,units:signed,timeInForce:'FOK',
+    positionFill:'OPEN_ONLY',priceBound:await this.formatPrice(symbol,bound.toString()),
+    stopLossOnFill:{price:stop,timeInForce:'GTC'},
+    clientExtensions:{id:clientId+'_order',tag:SHADOW_TAG},
+    tradeClientExtensions:{id:clientId,tag:SHADOW_TAG}
+   }
+   const b=await this.write('/v3/accounts/'+encodeURIComponent(env.OANDA_ACCOUNT_ID)+'/orders','POST',{order})
+   const fill=b.orderFillTransaction
+   const tradeId=fill?.tradeOpened?.tradeID||fill?.tradesOpened?.[0]?.tradeID
+   if(!tradeId)throw Error('OANDA did not confirm Shadow Trade ID; reconcile with broker before retrying')
+   return{tradeId:String(tradeId),fillPrice:String(fill.price||''),stopPrice:stop,transactionId:String(fill.id||'')}
+  })
+ }
+ async updatePracticeStopLoss(tradeId:string,symbol:string,price:string){
+  lowBudgetGuard.assertIdentity()
+  const own=await this.trade(tradeId)
+  if(!own||own.clientExtensions?.tag!==SHADOW_TAG||own.instrument!==symbol||own.state!=='OPEN')throw Error('SHADOW_TRADE_OWNERSHIP_MISMATCH')
+  const normalizedStop=await this.formatPrice(symbol,price)
+  const b=await this.write(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades/${encodeURIComponent(tradeId)}/orders`,'PUT',{
+   stopLoss:{price:normalizedStop,timeInForce:'GTC'}
+  })
+  return{tradeId,price:normalizedStop,lastTransactionID:String(b?.lastTransactionID||'')}
+ }
+ async closePracticeTrade(tradeId:string){
+  lowBudgetGuard.assertIdentity()
+  const own=await this.trade(tradeId)
+  if(!own||own.clientExtensions?.tag!==SHADOW_TAG||own.state!=='OPEN')throw Error('SHADOW_TRADE_OWNERSHIP_MISMATCH')
+  const b=await this.write(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades/${encodeURIComponent(tradeId)}/close`,'PUT',{units:'ALL'})
+  const fill=b?.orderFillTransaction
+  return{
+   tradeId,
+   fillPrice:String(fill?.price||''),
+   realizedPL:String(fill?.pl||fill?.tradesClosed?.[0]?.realizedPL||'0'),
+   transactionId:String(fill?.id||b?.lastTransactionID||'')
+  }
+ }
+
+ // Broker-authoritative, read-only snapshot. Never substitutes simulated P/L.
+ async authoritativeSnapshot(){
+  const [summary,trades]=await Promise.all([
+   this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/summary`),
+   this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/openTrades`)
+  ])
+  const a=summary.account
+  if(!a)throw new Error('OANDA account summary unavailable')
+  return{
+   source:'OANDA_API' as const,
+   retrievedAt:new Date().toISOString(),
+   accountId:String(a.id||env.OANDA_ACCOUNT_ID),
+   balance:String(a.balance),
+   equity:new Decimal(a.balance).plus(a.unrealizedPL||0).toString(),
+   unrealizedPL:String(a.unrealizedPL||'0'),
+   accountRealizedPL:String(a.pl||'0'),
+   marginUsed:String(a.marginUsed||'0'),
+   marginAvailable:String(a.marginAvailable||'0'),
+   openTrades:Array.isArray(trades.trades)?trades.trades:[]
+  }
+ }
+ // Confirmed closed-trade data comes only from OANDA, never from local paper P/L.
+ async closedTrades(count=100){
+  const limit=Math.max(1,Math.min(250,Math.floor(count)))
+  const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades?state=CLOSED&count=${limit}`)
+  if(!Array.isArray(b.trades))throw new Error('OANDA closed trades payload unavailable')
+  return b.trades as Array<{id:string;instrument:string;state:string;initialUnits:string;openTime:string;closeTime:string;realizedPL:string;price?:string;averageClosePrice?:string;stopLossOrder?:{price?:string};takeProfitOrder?:{price?:string}}>
+ }
+ // Historical midpoint candles are observations, NEVER executed fill prices.
+ // Reject candles that were not completed by the requested cutoff (prevent look-ahead).
+ async candlesBefore(symbol:string,granularity:'M1'|'M5'|'M10'|'M15'|'H1',before:string,count=40){
+  if(!/^[A-Z]{3}_[A-Z]{3}$/.test(symbol))throw new Error('Invalid historical instrument')
+  const ts=Date.parse(before)
+  if(!Number.isFinite(ts)||ts>Date.now()+60000)throw new Error('Invalid historical candle time')
+  const ms:{[key:string]:number}={M1:60000,M5:300000,M10:600000,M15:900000,H1:3600000}
+  const n=Math.max(25,Math.min(180,Math.floor(count)))
+  const path=`/v3/instruments/${symbol}/candles?price=M&granularity=${granularity}&count=${n+3}&to=${encodeURIComponent(new Date(ts).toISOString())}`
+  const b=await this.get(path)
+  if(!Array.isArray(b.candles))throw new Error('OANDA historical candles unavailable')
+  return b.candles.filter((c:any)=>c.complete&&c.mid&&Number.isFinite(Date.parse(String(c.time)))&&
+   Date.parse(String(c.time))+ms[granularity]<=ts).map((c:any)=>({
+    time:String(c.time),open:Number(c.mid.o),high:Number(c.mid.h),low:Number(c.mid.l),close:Number(c.mid.c),volume:Number(c.volume||0)
+   })).filter((c:any)=>[c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)).slice(-n)
+ }
+ // Strictly bounded completed bars from entry to close, with no synthetic interpolation.
+ // Caller must select a granularity fitting <=240 candles before fetching.
+ async candlesDuring(symbol:string,granularity:'M1'|'M5'|'M10'|'M15'|'H1'|'H4'|'D'|'W',from:string,to:string){
+  if(!/^[A-Z]{3}_[A-Z]{3}$/.test(symbol))throw new Error('Invalid historical instrument')
+  const fromMs=Date.parse(from),toMs=Date.parse(to)
+  const sizes:{[key:string]:number}={M1:60000,M5:300000,M10:600000,M15:900000,H1:3600000,H4:14400000,D:86400000,W:604800000}
+  const interval=sizes[granularity]
+  if(!Number.isFinite(fromMs)||!Number.isFinite(toMs)||fromMs>=toMs||toMs>Date.now()+60000)
+   throw new Error('Invalid OANDA trade history window')
+  if((toMs-fromMs)/interval>240)throw new Error('Trade history exceeds bounded candle request')
+  // Request one preceding bar for boundary alignment, then filter to the trade interval.
+  const fromQuery=new Date(fromMs-interval).toISOString()
+  const path=`/v3/instruments/${symbol}/candles?price=M&granularity=${granularity}&from=${encodeURIComponent(fromQuery)}&to=${encodeURIComponent(new Date(toMs).toISOString())}`
+  const b=await this.get(path)
+  if(!Array.isArray(b.candles))throw new Error('OANDA trade-interval candles unavailable')
+  return b.candles.filter((c:any)=>c.complete&&c.mid&&Number.isFinite(Date.parse(String(c.time)))&&
+   Date.parse(String(c.time))>=fromMs&&Date.parse(String(c.time))+interval<=toMs)
+   .map((c:any)=>({time:String(c.time),open:Number(c.mid.o),high:Number(c.mid.h),
+    low:Number(c.mid.l),close:Number(c.mid.c),volume:Number(c.volume||0)}))
+   .filter((c:any)=>[c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)).slice(0,240)
+ }
+ async candles(symbol:string,granularity:'M1'|'M5'|'M10'|'M15'|'D'|'W',count=60){
+  const b=await this.get(`/v3/instruments/${encodeURIComponent(symbol)}/candles?price=M&granularity=${granularity}&count=${count}`)
+  return (b.candles||[]).filter((c:any)=>c.complete&&c.mid).map((c:any)=>({
+   time:String(c.time),open:Number(c.mid.o),high:Number(c.mid.h),low:Number(c.mid.l),close:Number(c.mid.c),volume:Number(c.volume||0)
+  }))
+ }
+}
