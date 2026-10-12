@@ -69,7 +69,7 @@ export class OllamaPracticeBroker{
   if(q.symbol!==spec.symbol||!Number.isFinite(Date.parse(q.timestamp))||Date.now()-Date.parse(q.timestamp)>60000||
      Date.parse(q.timestamp)-Date.now()>10000)throw Error('STALE_OR_INVALID_OANDA_PRICE')
   const spread=new Decimal(q.ask).minus(q.bid).div('0.0001')
-  if(spread.lte(0)||spread.gt(3))throw Error('SPREAD_TOO_WIDE_FOR_OLLAMA')
+  if(spread.lte(0)||spread.gt(3))throw Error(`SPREAD_TOO_WIDE_FOR_OLLAMA: ${spec.symbol} spread=${spread.toFixed(2)} pips; max=3.00 pips; quoteTime=${q.timestamp}`)
   const dist=spec.direction==='long'?price.minus(stop):stop.minus(price)
   if(dist.lte(0)||dist.div(price).gt('0.008'))throw Error('OLLAMA_STOP_INVALID_OR_TOO_WIDE')
   if(spec.target){
