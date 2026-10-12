@@ -1,6 +1,8 @@
-import {existsSync,readFileSync} from 'node:fs'
+import {existsSync,readFileSync,mkdirSync,writeFileSync,renameSync} from 'node:fs'
 import {resolve,dirname} from 'node:path'
 import {fileURLToPath} from 'node:url'
+import {env} from '../config.js'
+import {SHADOW_TAG} from '../risk/LowBudgetGuard.js'
 import {strategyContext} from '../indicators.js'
 import type {Candle} from '../indicators.js'
 import type {OandaReadOnly} from '../broker/OandaReadOnly.js'
@@ -38,7 +40,7 @@ export type VerifiedLesson={
  charts?:SixChartSet
 }
 type Status='WAITING'|'READY'|'UNAVAILABLE'
-type Options={mirrorLogFile?:string;now?:()=>Date;refreshMs?:number}
+type Options={mirrorLogFile?:string;lessonStoreFile?:string|null;now?:()=>Date;refreshMs?:number}
 const here=dirname(fileURLToPath(import.meta.url))
 const root=resolve(here,'../../../')
 const validId=(x:unknown)=>typeof x==='string'&&/^\d+$/.test(x)
@@ -97,6 +99,7 @@ export function summarizeBrokerLessons(lessons:VerifiedLesson[]){
 }
 export class OandaOutcomeResearch{
  private readonly logPath:string
+ private readonly lessonStorePath:string|null
  private readonly now:()=>Date
  private readonly refreshMs:number
  private lastAttempt=0
@@ -112,8 +115,34 @@ export class OandaOutcomeResearch{
  private historyCap=100
  constructor(private broker:Broker,opts:Options={}){
   this.logPath=opts.mirrorLogFile||resolve(root,'logs/shadow-paper/trades.jsonl')
+  const safeId=(env.OANDA_ACCOUNT_ID||'not-configured').replace(/[^a-zA-Z0-9_-]/g,'_')
+  this.lessonStorePath=opts.lessonStoreFile===undefined
+   ?resolve(opts.mirrorLogFile?dirname(opts.mirrorLogFile):resolve(root,'data'),`forex-pobre-lessons-${safeId}.json`)
+   :opts.lessonStoreFile
   this.now=opts.now||(()=>new Date())
   this.refreshMs=opts.refreshMs??15*60*1000
+  this.loadLessons()
+ }
+ private loadLessons(){
+  if(!this.lessonStorePath||!existsSync(this.lessonStorePath))return
+  try{
+   const raw=JSON.parse(readFileSync(this.lessonStorePath,'utf8'))
+   if(raw?.version!==1||!Array.isArray(raw.lessons))return
+   this.lessons=raw.lessons.filter((l:VerifiedLesson)=>/^\d+$/.test(String(l.tradeId))&&
+    Number.isFinite(l.realizedPL)&&['WIN','LOSS','FLAT'].includes(l.outcome)).slice(-100)
+   this.lastSync=typeof raw.lastSync==='string'?raw.lastSync:null
+   for(const l of this.lessons)if(l.charts)this.chartCache.set(l.tradeId,l.charts)
+   // Cached lessons are read-only observations; next broker refresh confirms provenance.
+   this.status='WAITING'
+  }catch{this.error='Stored research unavailable; refreshing OANDA'}
+ }
+ private saveLessons(){
+  if(!this.lessonStorePath)return
+  mkdirSync(dirname(this.lessonStorePath),{recursive:true})
+  const tmp=this.lessonStorePath+'.tmp'
+  writeFileSync(tmp,JSON.stringify({version:1,source:'OANDA_API',lastSync:this.lastSync,
+   lessons:this.lessons.slice(-100)},null,2),'utf8')
+  renameSync(tmp,this.lessonStorePath)
  }
  snapshot(){return{
   source:'OANDA_CLOSED_TRADES' as const,attribution:'CONFIRMED_SHADOW_MIRROR_IDS_ONLY' as const,
@@ -155,7 +184,7 @@ export class OandaOutcomeResearch{
    const ids=existsSync(this.logPath)?verifiedMirrorIds(readFileSync(this.logPath,'utf8')):new Set<string>()
    const usable=raw.filter(t=>t.state==='CLOSED'&&Number.isFinite(Number(t.realizedPL))&&
     /^\w{3}_USD$/.test(t.instrument)&&Number.isFinite(Date.parse(t.openTime))&&Number.isFinite(Date.parse(t.closeTime)))
-   const matched=usable.filter(t=>ids.has(String(t.id))).sort((a,b)=>Date.parse(a.closeTime)-Date.parse(b.closeTime))
+   const matched=usable.filter(t=>ids.has(String(t.id))||t.clientExtensions?.tag===SHADOW_TAG).sort((a,b)=>Date.parse(a.closeTime)-Date.parse(b.closeTime))
    // Research only. Never changes broker orders or Shadow's strategy.
    // A maximum of one newly attributed trade gets expensive chart history per refresh.
    // Older trades remain eligible on subsequent refreshes; avoid unbounded OANDA traffic.
@@ -209,6 +238,7 @@ export class OandaOutcomeResearch{
    this.status='READY';this.error=null;this.lastSync=this.now().toISOString()
    this.closedTradesSeen=raw.length;this.linkedIds=ids.size
    this.missingAttribution=raw.length-matched.length
+   this.saveLessons()
   }catch(e){
    this.status='UNAVAILABLE';this.error=e instanceof Error?e.message:String(e)
    // Previous observations remain available but are explicitly marked stale/unavailable.
