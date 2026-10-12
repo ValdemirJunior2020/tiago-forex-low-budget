@@ -1,4 +1,4 @@
-name: Forex-Pobre build and tests
+name: Forex-Pobre Verify (OANDA-first)
 on:
   push:
   pull_request:
