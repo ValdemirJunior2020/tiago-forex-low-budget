@@ -2,7 +2,7 @@ import {existsSync,readFileSync,mkdirSync,writeFileSync,renameSync} from 'node:f
 import {resolve,dirname} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {env} from '../config.js'
-import {SHADOW_TAG} from '../risk/LowBudgetGuard.js'
+import {SHADOW_TAG,OLLAMA_TAG} from '../risk/LowBudgetGuard.js'
 import {openVikingBridge} from './OpenVikingBridge.js'
 import {strategyContext} from '../indicators.js'
 import type {Candle} from '../indicators.js'
@@ -36,7 +36,7 @@ export function chartCoverage(charts:SixChartSet|null|undefined){
   (charts.journey.bars.length>=2&&charts.journey.complete?1:0):0
 }
 export type VerifiedLesson={
- tradeId:string;symbol:string;direction:'LONG'|'SHORT';openedAt:string;closedAt:string;
+ strategy?:'SHADOW'|'OLLAMA';tradeId:string;symbol:string;direction:'LONG'|'SHORT';openedAt:string;closedAt:string;
  realizedPL:number;outcome:'WIN'|'LOSS'|'FLAT';features:MarketFeatures|null;
  charts?:SixChartSet
 }
@@ -146,11 +146,12 @@ export class OandaOutcomeResearch{
   renameSync(tmp,this.lessonStorePath)
  }
  snapshot(){return{
-  source:'OANDA_CLOSED_TRADES' as const,attribution:'CONFIRMED_SHADOW_MIRROR_IDS_ONLY' as const,
+  source:'OANDA_CLOSED_TRADES' as const,attribution:'CONFIRMED_FOREX_POBRE_SHADOW_AND_OLLAMA_TAGS' as const,
   status:this.status,lastSync:this.lastSync,error:this.error,
   reviewedBrokerClosedTrades:this.closedTradesSeen,recognizedMirrorIds:this.linkedIds,
   unattributedBrokerTrades:this.missingAttribution,historyCap:this.historyCap,
-  summary:summarizeBrokerLessons(this.lessons),
+  summary:summarizeBrokerLessons(this.lessons.filter(l=>(l.strategy||'SHADOW')==='SHADOW')),
+  ollamaSummary:summarizeBrokerLessons(this.lessons.filter(l=>l.strategy==='OLLAMA')),
   examples:this.lessons.slice(-8).reverse(),
   chartCoverage:this.lessons.filter(t=>chartCoverage(t.charts)===6).length,
   chartPartial:this.lessons.filter(t=>chartCoverage(t.charts)>0&&chartCoverage(t.charts)<6).length
@@ -170,7 +171,7 @@ export class OandaOutcomeResearch{
    }:null,
    entryTime:x.charts.entryTime,exitTime:x.charts.exitTime
   }:null,
-  note:'Actual OANDA closed trade, confirmed Shadow mirror ID. Observational sample, not a forecast.'
+  note:'Actual OANDA confirmed closed '+(x.strategy||'SHADOW')+' trade; observational sample, not a forecast.'
  }))}
  completedSince(start:string){
   const t=Date.parse(start)
@@ -185,7 +186,7 @@ export class OandaOutcomeResearch{
    const ids=existsSync(this.logPath)?verifiedMirrorIds(readFileSync(this.logPath,'utf8')):new Set<string>()
    const usable=raw.filter(t=>t.state==='CLOSED'&&Number.isFinite(Number(t.realizedPL))&&
     /^\w{3}_USD$/.test(t.instrument)&&Number.isFinite(Date.parse(t.openTime))&&Number.isFinite(Date.parse(t.closeTime)))
-   const matched=usable.filter(t=>ids.has(String(t.id))||t.clientExtensions?.tag===SHADOW_TAG).sort((a,b)=>Date.parse(a.closeTime)-Date.parse(b.closeTime))
+   const matched=usable.filter(t=>ids.has(String(t.id))||[SHADOW_TAG,OLLAMA_TAG].includes(t.clientExtensions?.tag||'')).sort((a,b)=>Date.parse(a.closeTime)-Date.parse(b.closeTime))
    // Research only. Never changes broker orders or Shadow's strategy.
    // A maximum of one newly attributed trade gets expensive chart history per refresh.
    // Older trades remain eligible on subsequent refreshes; avoid unbounded OANDA traffic.
@@ -232,7 +233,7 @@ export class OandaOutcomeResearch{
      }catch{this.contextCache.set(String(t.id),null)}
     }
     const pl=Number(t.realizedPL)
-    lessons.push({tradeId:String(t.id),symbol:t.instrument,direction:Number(t.initialUnits)<0?'SHORT':'LONG',
+    lessons.push({strategy:t.clientExtensions?.tag===OLLAMA_TAG?'OLLAMA':'SHADOW',tradeId:String(t.id),symbol:t.instrument,direction:Number(t.initialUnits)<0?'SHORT':'LONG',
      openedAt:t.openTime,closedAt:t.closeTime,realizedPL:pl,outcome:pl>0?'WIN':pl<0?'LOSS':'FLAT',features,charts:this.chartCache.get(String(t.id))})
    }
    this.lessons=lessons
