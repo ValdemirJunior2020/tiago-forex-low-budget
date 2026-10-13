@@ -82,6 +82,24 @@ describe('OANDA read-only outcome attribution',()=>{
   await rebooted.refresh()
   expect(rebooted.snapshot().summary.netPL).toBe(7.25)
  })
+ it('includes only broker-tagged Ollama closures in isolated learning while excluding manual account trades',async()=>{
+  const dir=mkdtempSync(join(tmpdir(),'ollama-verified-learning-'));dirs.push(dir)
+  const fake={closedTrades:async()=>[
+   {...trade('21','-2.48'),clientExtensions:{tag:'FOREX_POBRE_OLLAMA'}},
+   {...trade('10','3.50'),clientExtensions:{tag:'FOREX_POBRE_SHADOW'}},
+   trade('999','999.00')],
+   candlesBefore:async()=>bars(50,5),candlesDuring:async()=>bars(85,5)}
+  const research=new OandaOutcomeResearch(fake as any,{mirrorLogFile:join(dir,'missing.jsonl'),
+   lessonStoreFile:join(dir,'lessons.json'),now:()=>new Date('2026-10-14T15:00:00Z')})
+  await research.refresh()
+  const view=research.snapshot()
+  expect(view.summary.trades).toBe(1)
+  expect(view.summary.netPL).toBe(3.50)
+  expect(view.ollamaSummary.trades).toBe(1)
+  expect(view.ollamaSummary.netPL).toBe(-2.48)
+  expect(view.examples.some(x=>x.tradeId==='21'&&x.strategy==='OLLAMA')).toBe(true)
+  expect(view.examples.some(x=>x.tradeId==='999')).toBe(false)
+ })
  it('picks a bounded timeframe for the complete trade history rather than inventing a long M1 path',()=>{
   const at='2026-10-08T00:00:00.000Z'
   const later=(m:number)=>new Date(Date.parse(at)+m*60000).toISOString()
