@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto'
+import {oandaAuthGate} from './OandaAuthGate.js'
 import {lowBudgetGuard,SHADOW_TAG} from '../risk/LowBudgetGuard.js'
 import{Decimal}from'decimal.js'
 import type{AccountState,BrokerQuote}from'../types.js'
@@ -18,6 +19,7 @@ export class OandaReadOnly{
   })
   const b:any=await r.json().catch(()=>({}))
   if(!r.ok){
+   oandaAuthGate.trip(r.status)
    const detail=b?.errorMessage||b?.errorCode||`Broker HTTP ${r.status}`
    throw new Error(String(detail))
   }
@@ -31,7 +33,8 @@ export class OandaReadOnly{
    try{
     const r=await fetch(`${env.OANDA_REST_BASE_URL}${path}`,{headers:this.headers()})
     const b:any=await r.json().catch(()=>({}))
-    if(r.ok)return b
+    if(r.ok){if(path.endsWith('/summary')&&b?.account?.id===env.OANDA_ACCOUNT_ID)oandaAuthGate.verified();return b}
+    oandaAuthGate.trip(r.status)
     if(!retryable.has(r.status)||attempt===maxAttempts)throw new Error(`Broker HTTP ${r.status}`)
     lastError=new Error(`Broker HTTP ${r.status}`)
    }catch(e){
