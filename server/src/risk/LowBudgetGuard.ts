@@ -45,7 +45,13 @@ export class LowBudgetGuard {
   const price=new D(s.direction==='long'?q.asks?.[0]?.price:q.bids?.[0]?.price)
   if(!price.isFinite()||price.lte(0)||price.minus(ref).abs().div(ref).gt('.001'))throw Error('Quote slippage > 0.1%')
   const distance=s.direction==='long'?price.minus(stop):stop.minus(price)
-  if(distance.lte(0)||distance.div(price).gt('.008'))throw Error('INVALID_STOP')
+  if(distance.lte(0)||distance.div(price).gt('.008'))throw Error(
+   'INVALID_STOP: '+s.symbol+' '+s.direction+
+   ' brokerPrice='+price.toString()+
+   ' plannedStop='+stop.toString()+
+   ' distance='+distance.toString()+
+   ' maxPct=0.8% quoteTime='+String(q.time)
+  )
   let risk=distance.mul(u),notional=u.mul(price)
   if(risk.gt('2.50'))throw Error('MAX_TRADE_RISK_USD_2_50')
   for(const t of trades){
