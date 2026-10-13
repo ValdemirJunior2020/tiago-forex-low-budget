@@ -44,7 +44,8 @@ export class OllamaPracticeMirror{
     const loaded=JSON.parse(readFileSync(this.file,'utf8')) as State
     if(loaded.version!==1||!Array.isArray(loaded.closed)||!Array.isArray(loaded.events)||typeof loaded.initialized!=='boolean')
      throw Error('Incompatible existing Ollama mirror state')
-    this.state={...loaded,status:loaded.active
+    const authError=/(?:HTTP|OANDA)\\s*(?:401|403)|OANDA_AUTH_BLOCKED|UNAUTHORIZED|FORBIDDEN/i.test(String(loaded.lastError||''))
+    this.state={...loaded,status:authError?'AUTH_RETRY_PENDING':loaded.active
      ?(loaded.active.status==='REVIEW_REQUIRED'?'REVIEW_REQUIRED':'RECONCILING')
      :'WAITING_NEW_OLLAMA_SIGNAL'}
    }catch(e){this.state.status='REVIEW_REQUIRED';this.state.lastError='Mirror state unreadable; original preserved: '+String(e)}
