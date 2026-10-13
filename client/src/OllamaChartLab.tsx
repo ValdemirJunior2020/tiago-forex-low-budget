@@ -5,7 +5,7 @@ type ChartWindow={timeframe:TF;bars:Candle[]}
 type Journey={bars:Candle[];granularity:string;complete:boolean;note:string}
 type Charts={source:string;windows:ChartWindow[];journey:Journey;entryTime:string;exitTime:string;
  entryPrice:string|null;exitPrice:string|null;stopPrice:string|null;targetPrice:string|null}
-type Lesson={tradeId:string;symbol:string;direction:'LONG'|'SHORT';realizedPL:number;outcome:string;openedAt:string;closedAt:string;
+type Lesson={strategy?:'SHADOW'|'OLLAMA';tradeId:string;symbol:string;direction:'LONG'|'SHORT';realizedPL:number;outcome:string;openedAt:string;closedAt:string;
  features?:{rsi14:number;volumeRatio:number;macroTrend:string;bbPosition:string}|null;charts?:Charts}
 const timeframes:TF[]=['M1','M5','M10','M15','H1']
 const en:Record<TF,string>={M1:'MICRO / M1',M5:'ENTRADA / M5',M10:'TENDÊNCIA / M10',M15:'CONTEXTO / M15',H1:'MACRO / H1'}
@@ -164,16 +164,16 @@ export default function OllamaChartLab({data,lang}:{data:any;lang:'pt'|'en'}){
  return <><LiveSixOandaCharts lang={lang}/><section className="ollama-chartlab">
   <div className="chartlab-top"><div><span className="chartlab-kicker">OLLAMA • OANDA HISTÓRICO 6×</span>
    <h3>{lang==='pt'?'Laboratório dos 6 gráficos do 3/4':'Six-chart Shadow 3/4 laboratory'}</h3>
-   <p>{lang==='pt'?'Cinco períodos antes da entrada + trajetória da operação. Apenas candles reais e operações fechadas confirmadas pela OANDA.':'Five pre-entry timeframes plus trade lifecycle. Only OANDA midpoint candles and broker-attributed closed trades.'}</p>
+   <p>{lang==='pt'?'Cinco períodos antes da entrada + trajetória da operação. Trades Shadow e Ollama separados, confirmados pela OANDA.':'Five pre-entry timeframes plus trade lifecycle. Only OANDA midpoint candles and broker-attributed closed trades.'}</p>
   </div><div className="chartlab-count"><strong>{data?.chartCoverage??0}</strong>
    <small>{lang==='pt'?'trades com 6 gráficos':'trades with 6 charts'}</small></div></div>
   {data?.status==='UNAVAILABLE'&&<p className="chartlab-alert">{lang==='pt'?'Pesquisa OANDA indisponível: os dados podem estar desatualizados.':'OANDA research unavailable; previous data may be stale.'}</p>}
   {lessons.length===0?<div className="chartlab-empty">{lang==='pt'?'Aguardando candles históricos de operações Shadow identificadas por Trade ID. Sem dados fictícios.':'Waiting for verified Shadow trade histories; no fabricated chart data.'}</div>:
    <><div className="chartlab-trades">{lessons.map(l=><button key={l.tradeId} type="button" aria-pressed={current?.tradeId===l.tradeId}
     className={'chartlab-pick '+(current?.tradeId===l.tradeId?'chosen':'')} onClick={()=>setSelected(l.tradeId)}>
-    #{l.tradeId} · {l.symbol.replace('_','/')} · <strong className={l.realizedPL>=0?'win':'loss'}>{l.realizedPL>=0?'+':''}{'$'+l.realizedPL.toFixed(2)}</strong></button>)}</div>
+    {l.strategy||'SHADOW'} #{l.tradeId} · {l.symbol.replace('_','/')} · <strong className={l.realizedPL>=0?'win':'loss'}>{l.realizedPL>=0?'+':''}{'$'+l.realizedPL.toFixed(2)}</strong></button>)}</div>
    {current&&<><div className="chartlab-details">
-     <b>{current.symbol.replace('_','/')} · {current.direction} · {current.outcome}</b>
+     <b>{current.strategy||'SHADOW'} · {current.symbol.replace('_','/')} · {current.direction} · {current.outcome}</b>
      <span>OANDA #{current.tradeId} · RSI {current.features?.rsi14??'—'} · VOL {current.features?.volumeRatio??'—'}× · MACRO {current.features?.macroTrend??'—'} · BB {current.features?.bbPosition??'—'}</span>
      <small>{current.openedAt?.replace('T',' ').slice(0,19)} → {current.closedAt?.replace('T',' ').slice(0,19)} UTC</small>
      <b className={complete===6?'chartlab-six-ready':'chartlab-six-partial'}>{complete}/6 {lang==='pt'?'gráficos disponíveis':'charts available'}</b>
