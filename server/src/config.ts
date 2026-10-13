@@ -18,7 +18,6 @@ const s = z.object({
   OANDA_DEMO_MIRROR_ENABLED: z.string().default('false'),
   OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED: z.string().default('false'),
   OPENVIKING_ENABLED: z.string().default('false'),
-  OPENVIKING_API_KEY: z.string().default(''),
   OLLAMA_BASE_URL: z.string().default('http://127.0.0.1:11434'),
   OLLAMA_MODEL: z.string().default('qwen3:8b'),
   OLLAMA_TIMEOUT_MS: z.coerce.number().default(2000),
