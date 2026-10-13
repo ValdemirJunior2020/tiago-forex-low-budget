@@ -17,7 +17,7 @@ export class OpenVikingBridge {
   const timeout=setTimeout(()=>controller.abort(),5000)
   try{
    const resp=await fetch(this.base+path,{method:'POST',signal:controller.signal,headers:{
-    'Content-Type':'application/json',...(env.OPENVIKING_API_KEY?{'X-API-Key':env.OPENVIKING_API_KEY}:{})
+    'Content-Type':'application/json'
    },body:JSON.stringify(body)})
    const data:any=await resp.json().catch(()=>({}))
    if(!resp.ok||data.status==='error')throw Error('OpenViking HTTP '+resp.status+': '+String(data.error?.code||data.error?.message||'request rejected'))
