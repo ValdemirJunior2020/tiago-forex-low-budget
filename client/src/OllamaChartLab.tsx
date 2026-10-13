@@ -202,5 +202,5 @@ export default function OllamaChartLab({data,lang}:{data:any;lang:'pt'|'en'}){
     </div>
     <p className="chartlab-disclaimer">{lang==='pt'?'Candles MID históricos da OANDA não são preços de execução. RSI e Bollinger nesta tela são indicadores descritivos, calculados dos candles disponíveis. O resultado em USD vem exclusivamente do trade fechado na OANDA. Nenhum candle ausente é inventado.':'OANDA historical MID candles are not execution fills. On-screen RSI/Bollinger are descriptive only. USD P/L comes solely from the broker-closed trade. Missing candles are never interpolated.'}</p>
    </>}</>}
- </section>
+ </section></>
 }
