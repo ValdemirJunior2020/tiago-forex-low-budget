@@ -96,6 +96,29 @@ app.get('/api/oanda-audit',async(_q,res)=>{
  }catch(e){res.status(503).json({source:'OANDA_API',syncStatus:'UNAVAILABLE',error:e instanceof Error?e.message:String(e)})}
 })
 
+// Six read-only OANDA candle windows for visible live chart desk (separate from closed-trade research).
+// Cache per symbol to keep the local dashboard from flooding the Practice API.
+const liveChartCache=new Map<string,{until:number;result:unknown}>()
+app.get('/api/charts/live/:symbol',async(req,res)=>{
+ const symbol=String(req.params.symbol)
+ if(!['EUR_USD','GBP_USD'].includes(symbol)){res.status(400).json({error:'Unsupported chart symbol'});return}
+ const cache=liveChartCache.get(symbol)
+ if(cache&&Date.now()<cache.until){res.json(cache.result);return}
+ try{
+  const frames=['M1','M5','M10','M15','H1','H4'] as const
+  const settled=await Promise.allSettled(frames.map(tf=>broker.candles(symbol,tf,60)))
+  const windows=frames.map((timeframe,i)=>({
+   timeframe,
+   bars:settled[i].status==='fulfilled'?(settled[i] as PromiseFulfilledResult<Awaited<ReturnType<typeof broker.candles>>>).value:[],
+   error:settled[i].status==='rejected'?'OANDA candle request unavailable':null
+  }))
+  const payload={source:'OANDA_COMPLETED_MID_CANDLES',symbol,
+   updatedAt:new Date().toISOString(),windows}
+  liveChartCache.set(symbol,{until:Date.now()+60000,result:payload})
+  res.json(payload)
+ }catch(e){res.status(503).json({error:'Unable to load live OANDA chart windows'})}
+})
+
 app.get('/api/quote/:symbol',async(req,res)=>{
   try{res.json(await broker.quote(req.params.symbol))}
   catch(e){res.status(503).json({error:e instanceof Error?e.message:String(e)})}
