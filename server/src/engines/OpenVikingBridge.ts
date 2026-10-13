@@ -63,7 +63,7 @@ export class OpenVikingBridge {
     const uri='viking://resources/forex-pobre-'+this.accountKey+'/trade-'+lesson.tradeId+'.md'
     const content=[
      '# Forex-Pobre verified OANDA Practice trade',
-     'Trade ID: '+lesson.tradeId,'Symbol: '+lesson.symbol,'Direction: '+lesson.direction,
+     'Trade ID: '+lesson.tradeId,'Strategy: '+(lesson.strategy||'SHADOW'),'Symbol: '+lesson.symbol,'Direction: '+lesson.direction,
      'Outcome: '+lesson.outcome,'Realized P/L USD: '+lesson.realizedPL,
      'Opened: '+lesson.openedAt,'Closed: '+lesson.closedAt,
      'Observed indicators: '+JSON.stringify(lesson.features||{}),
