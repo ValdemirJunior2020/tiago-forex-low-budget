@@ -1,4 +1,4 @@
-import React,{useState} from 'react'
+import React,{useEffect,useState} from 'react'
 type Candle={time:string;open:number;high:number;low:number;close:number;volume:number}
 type TF='M1'|'M5'|'M10'|'M15'|'H1'
 type ChartWindow={timeframe:TF;bars:Candle[]}
@@ -97,6 +97,60 @@ function Candles({bars,title,period,isJourney,charts,lang,showBands,showVolume,s
   </div>
  </div>
 }
+type LiveCharts={source:string;symbol:string;updatedAt:string;windows:Array<{timeframe:string;bars:Candle[];error:string|null}>}
+const liveFrames=['M1','M5','M10','M15','H1','H4'] as const
+function LiveSixOandaCharts({lang}:{lang:'pt'|'en'}){
+ const [symbol,setSymbol]=useState<'EUR_USD'|'GBP_USD'>('EUR_USD')
+ const [live,setLive]=useState<LiveCharts|null>(null)
+ const [error,setError]=useState('')
+ const [loading,setLoading]=useState(false)
+ const [showBands,setShowBands]=useState(true)
+ const [showVolume,setShowVolume]=useState(true)
+ useEffect(()=>{
+  let active=true
+  const refresh=async()=>{
+   try{
+    setLoading(true)
+    const response=await fetch('http://127.0.0.1:8791/api/charts/live/'+symbol)
+    if(!response.ok)throw Error('OANDA API unavailable')
+    const value=await response.json() as LiveCharts
+    if(active){setLive(value);setError('')}
+   }catch(e){if(active)setError(e instanceof Error?e.message:String(e))}
+   finally{if(active)setLoading(false)}
+  }
+  setLive(null);void refresh()
+  const timer=setInterval(()=>{void refresh()},65000)
+  return()=>{active=false;clearInterval(timer)}
+ },[symbol])
+ const ready=live?.windows.filter(w=>w.bars?.length>=2).length??0
+ return <section className="ollama-chartlab">
+  <div className="chartlab-top"><div>
+   <span className="chartlab-kicker">OANDA PRACTICE • LIVE CHARTS 6×</span>
+   <h3>{lang==='pt'?'6 gráficos reais do mercado':'6 real market charts'}</h3>
+   <p>{lang==='pt'
+    ?'Candles fechados da OANDA, mesmo sem operações encerradas. Somente leitura. Atualização a cada 65 segundos.'
+    :'Completed OANDA candles even before a trade closes. Read-only, refreshed every 65 seconds.'}</p>
+  </div><div className="chartlab-count"><strong>{ready}/6</strong><small>{lang==='pt'?'gráficos disponíveis':'available charts'}</small></div></div>
+  <div className="chartlab-toolbar">
+   <label>{lang==='pt'?'Par':'Pair'} <select value={symbol} onChange={e=>setSymbol(e.target.value as 'EUR_USD'|'GBP_USD')}>
+    <option value="EUR_USD">EUR/USD</option><option value="GBP_USD">GBP/USD</option>
+   </select></label>
+   <label><input type="checkbox" checked={showBands} onChange={e=>setShowBands(e.target.checked)}/> Bollinger 20/2</label>
+   <label><input type="checkbox" checked={showVolume} onChange={e=>setShowVolume(e.target.checked)}/> Volume</label>
+   <small>{loading?(lang==='pt'?'Atualizando…':'Refreshing…'):live?.updatedAt?new Date(live.updatedAt).toLocaleTimeString():'—'}</small>
+  </div>
+  {error&&<p className="chartlab-alert">{lang==='pt'?'Não foi possível atualizar os gráficos: ':'Charts unavailable: '}{error}</p>}
+  <div className="chartlab-grid">
+   {liveFrames.map(tf=><Candles key={symbol+'-'+tf}
+    bars={live?.windows.find(w=>w.timeframe===tf)?.bars??[]}
+    title={symbol.replace('_','/')+' · '+tf} period={tf} lang={lang}
+    showBands={showBands} showVolume={showVolume} showTradeLines={false}/>)}
+  </div>
+  <p className="chartlab-disclaimer">{lang==='pt'
+   ?'Visualização: candles MID concluídos da OANDA. Estes gráficos não significam que seis imagens são enviadas ao modelo nem garantem uma operação.'
+   :'OANDA completed midpoint candle visualization. These are not six screenshots sent to the model.'}</p>
+ </section>
+}
 export default function OllamaChartLab({data,lang}:{data:any;lang:'pt'|'en'}){
  const lessons:Lesson[]=Array.isArray(data?.examples)?data.examples.filter((x:any)=>x.charts):[]
  const [selected,setSelected]=useState<string|null>(null)
@@ -107,8 +161,8 @@ export default function OllamaChartLab({data,lang}:{data:any;lang:'pt'|'en'}){
  const graphs=current?.charts?.windows??[]
  const complete=graphs.filter(x=>x.bars?.length>=2).length+
   (current?.charts?.journey?.complete&&current.charts.journey.bars.length>=2?1:0)
- return <section className="ollama-chartlab">
-  <div className="chartlab-top"><div><span className="chartlab-kicker">OLLAMA • OANDA CHART LAB 6×</span>
+ return <><LiveSixOandaCharts lang={lang}/><section className="ollama-chartlab">
+  <div className="chartlab-top"><div><span className="chartlab-kicker">OLLAMA • OANDA HISTÓRICO 6×</span>
    <h3>{lang==='pt'?'Laboratório dos 6 gráficos do 3/4':'Six-chart Shadow 3/4 laboratory'}</h3>
    <p>{lang==='pt'?'Cinco períodos antes da entrada + trajetória da operação. Apenas candles reais e operações fechadas confirmadas pela OANDA.':'Five pre-entry timeframes plus trade lifecycle. Only OANDA midpoint candles and broker-attributed closed trades.'}</p>
   </div><div className="chartlab-count"><strong>{data?.chartCoverage??0}</strong>
