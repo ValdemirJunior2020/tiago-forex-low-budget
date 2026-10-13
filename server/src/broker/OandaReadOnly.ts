@@ -195,7 +195,7 @@ export class OandaReadOnly{
     low:Number(c.mid.l),close:Number(c.mid.c),volume:Number(c.volume||0)}))
    .filter((c:any)=>[c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)).slice(0,240)
  }
- async candles(symbol:string,granularity:'M1'|'M5'|'M10'|'M15'|'D'|'W',count=60){
+ async candles(symbol:string,granularity:'M1'|'M5'|'M10'|'M15'|'H1'|'H4'|'D'|'W',count=60){
   const b=await this.get(`/v3/instruments/${encodeURIComponent(symbol)}/candles?price=M&granularity=${granularity}&count=${count}`)
   return (b.candles||[]).filter((c:any)=>c.complete&&c.mid).map((c:any)=>({
    time:String(c.time),open:Number(c.mid.o),high:Number(c.mid.h),low:Number(c.mid.l),close:Number(c.mid.c),volume:Number(c.volume||0)
