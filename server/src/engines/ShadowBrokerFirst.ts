@@ -145,19 +145,41 @@ export class ShadowBrokerFirst {
   const account=await this.broker.account()
   this.risk.recordEquity(account.equity)
   const capital=D.min(new D(1000),new D(account.equity))
-  const reference=direction==='long'?q.ask:q.bid
+  // The setup uses completed candles; reprice execution independently using a fresh
+  // OANDA bid/ask so an old scan quote cannot turn the intended hard stop invalid.
+  const latest=await this.broker.quote(symbol)
+  const quoteTime=Date.parse(latest.timestamp)
+  const spreadPips=new D(latest.ask).minus(latest.bid).div('0.0001')
+  if(!Number.isFinite(quoteTime)||Math.abs(Date.now()-quoteTime)>60000||
+     spreadPips.lte(0)||spreadPips.gt(3)){
+   logShadowTrade({event:'SHADOW_ENTRY_SKIPPED_QUOTE',symbol,
+    reason:!Number.isFinite(quoteTime)||Math.abs(Date.now()-quoteTime)>60000?'STALE_QUOTE':'SPREAD_EXCEEDS_3_PIPS',
+    quoteTime:latest.timestamp,spreadPips:spreadPips.toFixed(2)})
+   return
+  }
+  const reference=direction==='long'?latest.ask:latest.bid
   const plan=this.risk.plan(symbol,direction,reference,capital.toString(),candidate.matchedConditions)
   if(new D(plan.units).lte(0))return
-  const fill=await this.broker.openPracticeTrade(symbol,direction,plan.units,plan.hardStop,reference)
-  const official:any=await this.broker.trade(fill.tradeId)
-  if(!official||official.state!=='OPEN'||official.clientExtensions?.tag!==SHADOW_TAG||
-     !official.stopLossOrder?.price)throw Error('OANDA Trade ID is pending reconciliation: '+fill.tradeId)
-  this.state.position={tradeId:fill.tradeId,symbol,direction,units:plan.units,
-   entry:String(official.price),stop:String(official.stopLossOrder.price),originalStop:String(official.stopLossOrder.price),
-   startedAt:new Date().toISOString()}
-  this.state.lastAction={type:'SHADOW_OANDA_OPEN',tradeId:fill.tradeId,at:new Date().toISOString()}
-  this.save()
-  logShadowTrade({event:'SHADOW_OANDA_OPEN',source:'OANDA_API',tradeId:fill.tradeId,symbol,direction,fillPrice:String(official.price)})
+  try{
+   const fill=await this.broker.openPracticeTrade(symbol,direction,plan.units,plan.hardStop,reference)
+   const official:any=await this.broker.trade(fill.tradeId)
+   if(!official||official.state!=='OPEN'||official.clientExtensions?.tag!==SHADOW_TAG||
+      !official.stopLossOrder?.price)throw Error('OANDA Trade ID is pending reconciliation: '+fill.tradeId)
+   this.state.position={tradeId:fill.tradeId,symbol,direction,units:plan.units,
+    entry:String(official.price),stop:String(official.stopLossOrder.price),originalStop:String(official.stopLossOrder.price),
+    startedAt:new Date().toISOString()}
+   this.state.lastAction={type:'SHADOW_OANDA_OPEN',tradeId:fill.tradeId,at:new Date().toISOString()}
+   this.save()
+   logShadowTrade({event:'SHADOW_OANDA_OPEN',source:'OANDA_API',tradeId:fill.tradeId,symbol,direction,fillPrice:String(official.price)})
+  }catch(e){
+   if(String(e).includes('INVALID_STOP')){
+    logShadowTrade({event:'SHADOW_ENTRY_SKIPPED_STOP',symbol,direction,
+     reason:String(e),plannedStop:plan.hardStop,referencePrice:reference,spreadPips:spreadPips.toFixed(2)})
+    return
+   }
+   throw e
+  }
+
  }
  async tick(){
   if(this.busy)return
