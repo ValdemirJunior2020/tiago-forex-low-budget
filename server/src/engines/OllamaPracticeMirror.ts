@@ -3,6 +3,7 @@ import {resolve,dirname} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {Decimal} from 'decimal.js'
 import {env} from '../config.js'
+import {oandaAuthGate} from '../broker/OandaAuthGate.js'
 import {OllamaPracticeBroker,ollamaClientId,isTagged,OLLAMA_TRADE_TAG} from '../broker/OllamaPracticeBroker.js'
 import type{OpenSpec}from '../broker/OllamaPracticeBroker.js'
 import type{BrokerSignal}from './OllamaSignalEngine.js'
@@ -220,11 +221,28 @@ export class OllamaPracticeMirror{
     return
    }
    if(this.state.status==='REVIEW_REQUIRED')return
+   // Authentication recovery: never send a new order while the broker credential gate is tripped.
+   // A fresh account-summary confirmation elsewhere must clear it first.
+   if(!oandaAuthGate.snapshot().ok){
+    if(this.state.active){
+     this.state.status='AUTH_RETRY_PENDING'
+     this.state.lastError='OANDA authorization unavailable; existing trade will be reconciled after verified recovery'
+    }else{
+     this.state.status='AUTH_RETRY_PENDING'
+     this.state.lastError='OANDA authorization unavailable; new orders paused'
+    }
+    return
+   }
    await this.brokerSignalTick(this.getPaper())
   }catch(e){
    this.state.lastError=String(e)
-   this.state.status=this.state.active?'REVIEW_REQUIRED':'BLOCKED'
-   this.note('OLLAMA_OANDA_ERROR',this.state.lastError)
+   if(/(?:HTTP|OANDA)\s*(?:401|403)|OANDA_AUTH_BLOCKED|UNAUTHORIZED|FORBIDDEN/i.test(this.state.lastError)){
+    this.state.status='AUTH_RETRY_PENDING'
+    this.note('OLLAMA_OANDA_AUTH_RETRY_PENDING','Authenticated broker recheck required; no order retry')
+   }else{
+    this.state.status=this.state.active?'REVIEW_REQUIRED':'BLOCKED'
+    this.note('OLLAMA_OANDA_ERROR',this.state.lastError)
+   }
   }finally{
    this.busy=false
    this.state.lastUpdate=this.now().toISOString()
