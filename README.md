@@ -34,9 +34,8 @@ This integration is **disabled by default** and does not change trading signals,
 Once OpenViking is configured and serving on http://127.0.0.1:1933, add to this repo's private `.env`:
 ```ini
 OPENVIKING_ENABLED=true
-OPENVIKING_API_KEY=
 ```
-If your local OpenViking configuration requires an API key, set `OPENVIKING_API_KEY` privately.
+The sidecar uses localhost only and does not send API credentials.
 Never commit your `.env`.
 
 Restart only this Forex-Pobre process after checking broker positions. To verify locally,
