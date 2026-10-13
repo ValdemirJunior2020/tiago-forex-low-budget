@@ -12,9 +12,9 @@ export class OpenVikingBridge {
  private readonly accountKey=createHash('sha256').update(env.OANDA_ACCOUNT_ID||'unconfigured').digest('hex').slice(0,12)
  get enabled(){return env.OPENVIKING_ENABLED==='true'}
  snapshot(){return {enabled:this.enabled,endpoint:this.base,mode:'READ_ONLY_TRADE_LESSONS',lastSync:this.lastSync,lastError:this.lastError,submittedThisRun:this.sent.size}}
- private async post(path:string,body:unknown){
+ private async post(path:string,body:unknown,timeoutMs=15000){
   const controller=new AbortController()
-  const timeout=setTimeout(()=>controller.abort(),5000)
+  const timeout=setTimeout(()=>controller.abort(),timeoutMs)
   try{
    const resp=await fetch(this.base+path,{method:'POST',signal:controller.signal,headers:{
     'Content-Type':'application/json'
@@ -30,6 +30,8 @@ export class OpenVikingBridge {
    const c=new AbortController(),timer=setTimeout(()=>c.abort(),2500)
    try{
     const r=await fetch(this.base+'/health',{signal:c.signal})
+    // Clear obsolete connectivity failures once the health endpoint is reachable.
+    if(r.ok&&this.lastError?.includes('fetch failed'))this.lastError=null
     return {...this.snapshot(),reachable:r.ok}
    }finally{clearTimeout(timer)}
   }catch{return {...this.snapshot(),reachable:false}}
@@ -42,6 +44,7 @@ export class OpenVikingBridge {
     target_uri:'viking://resources/forex-pobre-'+this.accountKey,
     limit:3
    })
+   this.lastError=null
    const data=result.result??result
    const hits=Array.isArray(data.resources)?data.resources:Array.isArray(data.hits)?data.hits:[]
    return hits.slice(0,3).map((v:any)=>String(v.abstract||v.overview||v.snippet||'').slice(0,300))
@@ -69,10 +72,10 @@ export class OpenVikingBridge {
      'For research only. Do not treat historical results as guaranteed future returns.'
     ].join('\n')
     // Create once; if a previous session already created the URI, replace it.
-    try{await this.post('/api/v1/content/write',{uri,content,mode:'create',wait:false})}
+    try{await this.post('/api/v1/content/write',{uri,content,mode:'create',wait:false},12000)}
     catch(e){
      if(!String(e).includes('409')&&!String(e).includes('ALREADY_EXISTS'))throw e
-     await this.post('/api/v1/content/write',{uri,content,mode:'replace',wait:false})
+     await this.post('/api/v1/content/write',{uri,content,mode:'replace',wait:false},12000)
     }
     this.sent.add(key)
     this.lastSync=new Date().toISOString();this.lastError=null
