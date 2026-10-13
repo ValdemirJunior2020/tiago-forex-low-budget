@@ -1,4 +1,5 @@
 import {Decimal as D} from 'decimal.js'
+import {oandaAuthGate} from '../broker/OandaAuthGate.js'
 import {env} from '../config.js'
 import {RiskManager} from './RiskManager.js'
 import {resolve,dirname} from 'node:path'
@@ -20,7 +21,7 @@ export class LowBudgetGuard {
   const timer=setTimeout(()=>controller.abort(),12000)
   try{
    const response=await fetch('https://api-fxpractice.oanda.com'+path,{headers:{Authorization:'Bearer '+env.OANDA_API_TOKEN},signal:controller.signal})
-   if(!response.ok)throw Error('OANDA HTTP '+response.status)
+   if(!response.ok){oandaAuthGate.trip(response.status);throw Error('OANDA HTTP '+response.status)}
    return await response.json() as any
   }finally{clearTimeout(timer)}
  }
@@ -75,6 +76,7 @@ export class LowBudgetGuard {
   const next=new Promise<void>(r=>release=r),previous=this.tail
   this.tail=next;await previous
   try{
+   oandaAuthGate.assertMayOpen()
    if(env.LOW_BUDGET_TRADING_ENABLED!=='true')throw Error('LOW_BUDGET_TRADING_DISABLED')
    await this.validate(s)
    return await fn()
