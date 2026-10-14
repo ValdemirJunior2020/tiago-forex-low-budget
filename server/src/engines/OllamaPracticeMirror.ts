@@ -240,6 +240,11 @@ export class OllamaPracticeMirror{
    if(/(?:HTTP|OANDA)\s*(?:401|403)|OANDA_AUTH_BLOCKED|UNAUTHORIZED|FORBIDDEN/i.test(this.state.lastError)){
     this.state.status='AUTH_RETRY_PENDING'
     this.note('OLLAMA_OANDA_AUTH_RETRY_PENDING','Authenticated broker recheck required; no order retry')
+   }else if(/(?:Broker|OANDA) HTTP (?:502|503|504)|fetch failed|ECONNRESET|ETIMEDOUT|AbortError/i.test(this.state.lastError)){
+    // Transient read failures must not permanently freeze broker monitoring.
+    // No new orders are retried; next tick checks the existing broker trade again.
+    this.state.status='BROKER_RETRY_PENDING'
+    this.note('OLLAMA_OANDA_TRANSIENT_RETRY','Broker read unavailable; retrying reconciliation next cycle')
    }else{
     this.state.status=this.state.active?'REVIEW_REQUIRED':'BLOCKED'
     this.note('OLLAMA_OANDA_ERROR',this.state.lastError)
