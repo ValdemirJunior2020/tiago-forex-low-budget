@@ -50,8 +50,9 @@ export function parseAiLabDecision(raw:unknown):AiDecision{
  return{decision:mapped as Action,confidence:d.confidence,reason:d.reason.trim()}
 }
 export async function queryIndependentOllama(market:Market):Promise<AiDecision>{
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000)
- try{
+ // Bound each local Ollama inference independently. An expired attempt must not poison retries.
+ const timeoutMs=Math.max(12000,Math.min(30000,env.OLLAMA_TIMEOUT_MS))
+ {
   const system='You are an OANDA Practice broker-only trading signal agent. Do not simulate trades or profits. Every response must consider both BUY and SELL hypotheses (including a trend continuation while Bollinger is inside) and a WAIT option. Distinguish no fully confirmed setup from a possible directional hypothesis. Calculate from supplied completed candles and objective setup checks, not imagination. RSI below 30 = OVERSOLD, above 70 = OVERBOUGHT, 30 through 70 = NEUTRAL; RSI 35 is NOT oversold. Low tick volume alone or no confirmed Shadow trade sample does NOT automatically forbid a signal. A verified Shadow outcome sample below 20 trades is observational, never a predictive rule. Answer JSON ONLY {"decision":"BUY|SELL|WAIT|CLOSE","confidence":0.0,"reason":"specific price and indicator evidence plus uncertainty"}; confidence is your assessment, not calibrated win probability. Prefer WAIT if neither direction has convincing evidence. CLOSE is not supported; prefer WAIT. Broker orders, stops, and targets are managed separately on OANDA Practice. Never alter Shadow or risk rules.'
   const base={symbol:market.symbol,quote:market.quote,mode:'OANDA_PRACTICE_ONLY',
    m5:market.m5.slice(-25),m10:market.m10.slice(-20),indicators:market.indicators,
@@ -59,7 +60,8 @@ export async function queryIndependentOllama(market:Market):Promise<AiDecision>{
    optionalVerifiedVikingMemories:market.vikingMemories||[],
    brokerHistoryNote:'Historical broker sample is optional context; do not default to WAIT just because confirmed broker outcomes are few.'}
   let failure='Model response invalid'
-  for(let attempt=0;attempt<3;attempt++){
+  for(let attempt=0;attempt<2;attempt++){
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs)
    try{
     const response=await fetch(env.OLLAMA_BASE_URL+'/api/chat',{
      method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},
@@ -91,14 +93,14 @@ export async function queryIndependentOllama(market:Market):Promise<AiDecision>{
    }catch(error){
     failure=error instanceof Error?error.message:String(error)
     // Network failure or canceled request must not be disguised as a valid signal.
-    if(controller.signal.aborted)break
-   }
+    if(controller.signal.aborted)failure='OLLAMA_TIMEOUT_AFTER_'+timeoutMs+'MS'
+   }finally{clearTimeout(timer)}
   }
   // Refuse broker signals on malformed AI output.
   // Caller records an explicit error so the UI reflects real reliability issues.
   throw new Error('Ollama decision rejected after retries: '+failure)
 
- }finally{clearTimeout(timer)}
+ }
 }
 export class OllamaSignalEngine{
  private state:LabState
