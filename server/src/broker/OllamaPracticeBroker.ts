@@ -3,6 +3,7 @@ import {lowBudgetGuard,OLLAMA_TAG} from '../risk/LowBudgetGuard.js'
 import {createHash} from 'node:crypto'
 import {env} from '../config.js'
 import {OandaReadOnly} from './OandaReadOnly.js'
+import {oandaAuthGate} from './OandaAuthGate.js'
 
 export const OLLAMA_TRADE_TAG=OLLAMA_TAG
 export type TaggedTrade={id:string;instrument:string;state:string;currentUnits:string;initialUnits?:string;realizedPL?:string;unrealizedPL?:string;price?:string;stopLossOrder?:{price?:string};clientExtensions?:{id?:string;tag?:string}}
@@ -22,6 +23,7 @@ export class OllamaPracticeBroker{
  constructor(private readonly readOnly:Pick<OandaReadOnly,'positions'|'trade'|'account'|'quote'|'formatPrice'|'marginMetrics'>=new OandaReadOnly()){}
  private async request(path:string,method:'GET'|'POST'|'PUT'='GET',body?:unknown){
   requirePractice()
+  if(method!=='GET')oandaAuthGate.assertMayOpen()
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000)
   try{
    const r=await fetch(practice+path,{
@@ -30,7 +32,8 @@ export class OllamaPracticeBroker{
     ...(body===undefined?{}:{body:JSON.stringify(body)})
    })
    const b:any=await r.json().catch(()=>({}))
-   if(!r.ok)throw Error('OANDA HTTP '+r.status+': '+String(b.errorMessage||b.errorCode||'request rejected').slice(0,250))
+   if(!r.ok){oandaAuthGate.trip(r.status);throw Error('OANDA HTTP '+r.status+': '+String(b.errorMessage||b.errorCode||'request rejected').slice(0,250))}
+   if(path.endsWith('/summary')&&b?.account?.id===env.OANDA_ACCOUNT_ID)oandaAuthGate.verified()
    return b
   }finally{clearTimeout(timer)}
  }
