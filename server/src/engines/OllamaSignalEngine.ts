@@ -60,7 +60,7 @@ export async function queryIndependentOllama(market:Market):Promise<AiDecision>{
    optionalVerifiedVikingMemories:market.vikingMemories||[],
    brokerHistoryNote:'Historical broker sample is optional context; do not default to WAIT just because confirmed broker outcomes are few.'}
   let failure='Model response invalid'
-  for(let attempt=0;attempt<2;attempt++){
+  for(let attempt=0;attempt<3;attempt++){
    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs)
    try{
     const response=await fetch(env.OLLAMA_BASE_URL+'/api/chat',{
