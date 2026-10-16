@@ -1,10 +1,13 @@
-import {afterEach,describe,expect,it,vi} from 'vitest'
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest'
 import {OandaReadOnly} from './OandaReadOnly.js'
 import {oandaAuthGate} from './OandaAuthGate.js'
 import {env} from '../config.js'
 
 const originalFetch=globalThis.fetch
-afterEach(()=>{globalThis.fetch=originalFetch;oandaAuthGate.verified();vi.restoreAllMocks()})
+const originalAccount=env.OANDA_ACCOUNT_ID
+const originalToken=env.OANDA_API_TOKEN
+beforeEach(()=>{env.OANDA_ACCOUNT_ID='101-001-TEST-001';env.OANDA_API_TOKEN='test-only-not-a-real-token'})
+afterEach(()=>{globalThis.fetch=originalFetch;env.OANDA_ACCOUNT_ID=originalAccount;env.OANDA_API_TOKEN=originalToken;oandaAuthGate.verified();vi.restoreAllMocks()})
 describe('intermittent OANDA GET authorization failures',()=>{
  it('retries 401 on read-only pricing and keeps entries blocked until verified account summary',async()=>{
   let calls=0
