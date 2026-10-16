@@ -26,7 +26,9 @@ export class OandaReadOnly{
   return b
  }
  private async get(path:string){
-  const retryable=new Set([502,503,504])
+  // Intermittent 401 has been observed in otherwise healthy Practice sessions.
+  // Retry GET only; never replay POST/PUT orders.
+  const retryable=new Set([401,502,503,504])
   const maxAttempts=4
   let lastError:unknown=null
   for(let attempt=1;attempt<=maxAttempts;attempt++){
@@ -41,7 +43,7 @@ export class OandaReadOnly{
     lastError=e
     const msg=e instanceof Error?e.message:String(e)
     const transientFetchFailure=msg==='fetch failed'||msg.includes('ECONNRESET')||msg.includes('ETIMEDOUT')
-    if((!transientFetchFailure&&!msg.includes('Broker HTTP 502')&&!msg.includes('Broker HTTP 503')&&!msg.includes('Broker HTTP 504'))||attempt===maxAttempts)throw e
+    if((!transientFetchFailure&&!msg.includes('Broker HTTP 401')&&!msg.includes('Broker HTTP 502')&&!msg.includes('Broker HTTP 503')&&!msg.includes('Broker HTTP 504'))||attempt===maxAttempts)throw e
    }
    await new Promise(resolve=>setTimeout(resolve,500*Math.pow(2,attempt-1)))
   }
