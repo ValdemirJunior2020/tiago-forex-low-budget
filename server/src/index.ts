@@ -12,6 +12,7 @@ import{lowBudgetGuard,SHADOW_TAG}from'./risk/LowBudgetGuard.js'
 import{Decimal}from'decimal.js'
 import {openVikingBridge} from './engines/OpenVikingBridge.js'
 import {oandaAuthGate} from './broker/OandaAuthGate.js'
+import {oandaAvailabilityGate} from './broker/OandaAvailabilityGate.js'
 
 const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowBrokerFirst(broker),
  ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot())
@@ -34,6 +35,7 @@ app.get('/health',async(_q,res)=>{
     mode:OANDA_DEMO_MIRROR_ENABLED?'OANDA_PRACTICE_MIRROR':'READ_ONLY_TRADE_PLANNER',
     brokerMode:BROKER_MODE,
     oandaAuth:oandaAuthGate.snapshot(),
+    oandaAvailability:oandaAvailabilityGate.snapshot(),
     practiceOnly:true,
     demoMirror:{enabled:OANDA_DEMO_MIRROR_ENABLED,strategy:'SHADOW_3_OF_4',practiceOnly:true},
     ollamaPracticeMirror:ollamaMirror.snapshot(),
