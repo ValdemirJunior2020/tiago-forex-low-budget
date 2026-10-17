@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import {oandaAuthGate} from './OandaAuthGate.js'
+import {oandaAvailabilityGate} from './OandaAvailabilityGate.js'
 import {lowBudgetGuard,SHADOW_TAG} from '../risk/LowBudgetGuard.js'
 import{Decimal}from'decimal.js'
 import type{AccountState,BrokerQuote}from'../types.js'
@@ -26,6 +27,7 @@ export class OandaReadOnly{
   return b
  }
  private async get(path:string){
+  oandaAvailabilityGate.assertRead()
   // Intermittent 401 has been observed in otherwise healthy Practice sessions.
   // Retry GET only; never replay POST/PUT orders.
   const retryable=new Set([401,502,503,504])
@@ -35,14 +37,18 @@ export class OandaReadOnly{
    try{
     const r=await fetch(`${env.OANDA_REST_BASE_URL}${path}`,{headers:this.headers()})
     const b:any=await r.json().catch(()=>({}))
-    if(r.ok){if(path.endsWith('/summary')&&b?.account?.id===env.OANDA_ACCOUNT_ID)oandaAuthGate.verified();return b}
+    if(r.ok){oandaAvailabilityGate.recordSuccess();if(path.endsWith('/summary')&&b?.account?.id===env.OANDA_ACCOUNT_ID)oandaAuthGate.verified();return b}
     oandaAuthGate.trip(r.status)
-    if(!retryable.has(r.status)||attempt===maxAttempts)throw new Error(`Broker HTTP ${r.status}`)
+    if(!retryable.has(r.status)||attempt===maxAttempts){
+     if([502,503,504].includes(r.status))oandaAvailabilityGate.recordFailure('Broker HTTP '+r.status)
+     throw new Error(`Broker HTTP ${r.status}`)
+    }
     lastError=new Error(`Broker HTTP ${r.status}`)
    }catch(e){
     lastError=e
     const msg=e instanceof Error?e.message:String(e)
     const transientFetchFailure=msg==='fetch failed'||msg.includes('ECONNRESET')||msg.includes('ETIMEDOUT')
+    if(transientFetchFailure&&attempt===maxAttempts)oandaAvailabilityGate.recordFailure('BROKER_NETWORK_UNAVAILABLE')
     if((!transientFetchFailure&&!msg.includes('Broker HTTP 401')&&!msg.includes('Broker HTTP 502')&&!msg.includes('Broker HTTP 503')&&!msg.includes('Broker HTTP 504'))||attempt===maxAttempts)throw e
    }
    await new Promise(resolve=>setTimeout(resolve,500*Math.pow(2,attempt-1)))
