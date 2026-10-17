@@ -19,6 +19,8 @@ const blank=():State=>({lastCandle:{},position:null,lastCandidate:null,candidate
 export class ShadowBrokerFirst {
  private state:State=blank()
  private busy=false
+ private lastUpstreamLogAt=0
+ private upstreamDegraded=false
  private timer:NodeJS.Timeout|null=null
  private readonly risk=new RiskManager(resolve(root,'data/forex-pobre-risk.json'))
  private readonly ai:OllamaSignalEngine
@@ -190,11 +192,25 @@ export class ShadowBrokerFirst {
    const a=await this.broker.account()
    this.risk.recordEquity(a.equity)
    await this.reconcile()
+   if(this.upstreamDegraded){
+    this.upstreamDegraded=false;this.lastUpstreamLogAt=0
+    logShadowTrade({event:'SHADOW_OANDA_RECOVERED',source:'OANDA_API'})
+   }
    for(const symbol of SHADOW_OANDA_PAIRS){
     try{await this.scan(symbol)}catch(e){logShadowTrade({event:'SHADOW_OANDA_ERROR',symbol,error:String(e)})}
     await this.ai.process(symbol)
    }
-  }catch(e){logShadowTrade({event:'SHADOW_RECONCILE_ERROR',error:String(e)})}
+  }catch(e){
+   const detail=String(e)
+   if(/OANDA_UPSTREAM_COOLDOWN|Broker HTTP (?:502|503|504)|fetch failed|ECONNRESET|ETIMEDOUT/i.test(detail)){
+    const now=Date.now()
+    if(!this.upstreamDegraded||now-this.lastUpstreamLogAt>=300000){
+     logShadowTrade({event:'SHADOW_OANDA_UPSTREAM_DEGRADED',error:detail,reason:'Broker read-only outage; next probe follows bounded cooldown'})
+     this.lastUpstreamLogAt=now
+    }
+    this.upstreamDegraded=true
+   }else logShadowTrade({event:'SHADOW_RECONCILE_ERROR',error:detail})
+  }
   finally{this.busy=false}
  }
 }
