@@ -12,6 +12,7 @@ import {scanOllamaSetups,questionableRsiReason} from './OllamaSignalReview.js'
 import type {SetupReview} from './OllamaSignalReview.js'
 import type {OandaReadOnly} from '../broker/OandaReadOnly.js'
 import {isOandaForexSessionOpen} from '../broker/OandaMarketHours.js'
+import {oandaAvailabilityGate} from '../broker/OandaAvailabilityGate.js'
 
 export const OLLAMA_LAB_VERSION='ollama-oanda-signal-v2'
 const MAX_SPREAD_PCT=new Decimal('0.0015')
@@ -208,7 +209,7 @@ export class OllamaSignalEngine{
    at,candleTime,confidence:decision.confidence}
  }
  async process(symbol:string){
-  if(this.state.paused||!PAIRS.includes(symbol))return
+  if(this.state.paused||!PAIRS.includes(symbol)||!oandaAvailabilityGate.canRead())return
   try{
    if(!isOandaForexSessionOpen(this.now())){
     // A single informative event per market closure; no repeated bad-quote errors.
@@ -257,6 +258,7 @@ export class OllamaSignalEngine{
      reason:'Practice order intent, awaiting broker validation.',signalKey:signal.key},true)
    }
   }catch(e){
+   if(String(e).includes('OANDA_UPSTREAM_COOLDOWN'))return
    this.state.errors++;this.state.status='ERROR'
    this.record('OLLAMA_LAB_ERROR',{symbol,reason:e instanceof Error?e.message:String(e)})
   }
