@@ -8,7 +8,8 @@ import type{BrokerSignal}from'./OllamaSignalEngine.js'
 import{OLLAMA_TRADE_TAG,isTagged,ollamaClientId}from'../broker/OllamaPracticeBroker.js'
 
 const initialMirrorEnabled=env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED
-beforeEach(()=>{env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED='true'})
+const initialNewEntries=env.OLLAMA_NEW_ENTRIES_ENABLED
+beforeEach(()=>{env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED='true';env.OLLAMA_NEW_ENTRIES_ENABLED='true'})
 const dirs:string[]=[]
 const now=()=>new Date('2026-10-09T19:30:00.000Z') // Friday 15:30 EDT, session open
 let sequence=0
@@ -49,8 +50,30 @@ function harness(existing:BrokerSignal|null=null){
   setShadow:(s:string|null)=>{shadow={position:s?{symbol:s}:null}},
   setOldPaper:()=>{view={lastBrokerSignal:null,position:{symbol:'EUR_USD',openedAt:now().toISOString()}}}}
 }
-afterEach(()=>{env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED=initialMirrorEnabled;for(const dir of dirs.splice(0))rmSync(dir,{recursive:true,force:true})})
+afterEach(()=>{env.OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED=initialMirrorEnabled;env.OLLAMA_NEW_ENTRIES_ENABLED=initialNewEntries;for(const dir of dirs.splice(0))rmSync(dir,{recursive:true,force:true})})
 describe('Ollama OANDA Practice direct execution, no virtual mirroring',()=>{
+ it('pauses new Ollama entries while preserving existing broker monitoring',async()=>{
+  const h=harness()
+  await h.mirror.checkNow()
+  env.OLLAMA_NEW_ENTRIES_ENABLED='false'
+  h.show(signal());await h.mirror.checkNow()
+  expect(h.calls.open).toBe(0)
+  expect(h.calls.validate).toBe(0)
+  expect(h.mirror.snapshot().newEntriesEnabled).toBe(false)
+  expect(h.mirror.snapshot().status).toBe('SHADOW_ONLY_RESEARCH')
+  // No delayed execution if re-enabled later: the paused signal is consumed.
+  env.OLLAMA_NEW_ENTRIES_ENABLED='true'
+  await h.mirror.checkNow()
+  expect(h.calls.open).toBe(0)
+  h.show(signal());await h.mirror.checkNow()
+  expect(h.calls.open).toBe(1)
+  env.OLLAMA_NEW_ENTRIES_ENABLED='false'
+  await h.mirror.checkNow()
+  expect(h.mirror.snapshot().tradeId).toBe('91')
+  h.trades[0].state='CLOSED';await h.mirror.checkNow()
+  expect(h.mirror.snapshot().closedTrades).toBe(1)
+  expect(h.calls.close).toBe(0)
+ })
  it('does not execute a signal already present at startup',async()=>{
   const h=harness(signal())
   await h.mirror.checkNow();await h.mirror.checkNow()
