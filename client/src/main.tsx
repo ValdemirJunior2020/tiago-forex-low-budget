@@ -13,6 +13,7 @@ type Quote={symbol:string;bid:string;ask:string;mid:string;timestamp:string}
 function ollamaOandaStatus(status:string|undefined,lang:Lang){
  const label:Record<string,[string,string]>={
   MARKET_CLOSED:['MERCADO FECHADO','MARKET CLOSED'],
+  SHADOW_ONLY_RESEARCH:['OLLAMA: SOMENTE ANÁLISE','OLLAMA: RESEARCH ONLY'],
   WAITING_SHADOW_FREE:['AGUARDANDO PAR LIVRE','WAITING FOR FREE PAIR'],
   WAITING_NEW_OLLAMA_SIGNAL:['AGUARDANDO NOVO SINAL','WAITING FOR NEW SIGNAL'],
   BROKER_OPEN:['TRADE CONFIRMADO NA OANDA','OANDA TRADE OPEN'],
@@ -357,6 +358,9 @@ function App(){
             </div>
             <span>{lang==='pt'?'MESMA CONTA • TRADE ID ISOLADO':'SAME ACCOUNT • SEPARATE TRADE ID'}</span>
           </div>
+          {ollamaMirror?.newEntriesEnabled===false&&<p className="ollama-oanda-warning">
+            {lang==='pt'?'TESTE FINAL: apenas o Shadow 3/4 abre novas operações. O Ollama segue em análise e acompanha trades existentes. Novas entradas encerram automaticamente após 21/10/2026 (ET).':'FINAL TRIAL: only Shadow 3/4 may open new trades. Ollama continues research and tracks existing trades. New entries end after Oct 21, 2026 (ET).'}
+          </p>}
           <div className="ollama-oanda-values">
             <div><small>{lang==='pt'?'P/L REALIZADO NA OANDA':'REALIZED OANDA P/L'}</small><strong>{ollamaMirror?.source==='OANDA_API'?signedMoney(ollamaMirror.realizedPL):'—'}</strong></div>
             <div><small>{lang==='pt'?'TRADE ID OANDA':'OANDA TRADE ID'}</small><strong>{ollamaMirror?.tradeId??'—'}</strong></div>
