@@ -17,6 +17,7 @@ const s = z.object({
   OANDA_REST_BASE_URL: z.string().default('https://api-fxpractice.oanda.com'),
   OANDA_DEMO_MIRROR_ENABLED: z.string().default('false'),
   OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED: z.string().default('false'),
+  OLLAMA_NEW_ENTRIES_ENABLED: z.string().default('false'),
   OPENVIKING_ENABLED: z.string().default('false'),
   OLLAMA_BASE_URL: z.string().default('http://127.0.0.1:11434'),
   OLLAMA_MODEL: z.string().default('qwen3:8b'),
