@@ -9,6 +9,7 @@ import {RiskManager} from '../risk/RiskManager.js'
 import {SHADOW_OANDA_PAIRS,env} from '../config.js'
 import {SHADOW_TAG} from '../risk/LowBudgetGuard.js'
 import {OllamaSignalEngine} from './OllamaSignalEngine.js'
+import {finalTrialAllowsNewEntry} from './FinalTrialWindow.js'
 import {logShadowTrade,logShadowCandidate} from './logger.js'
 type Side='long'|'short'
 type Position={tradeId:string;symbol:string;direction:Side;units:string;entry:string;stop:string;originalStop:string;peakExit?:string;startedAt:string}
@@ -144,6 +145,8 @@ export class ShadowBrokerFirst {
    if(p.symbol===symbol&&p.direction!==direction)await this.close('OPPOSITE_3_OF_4')
   }
   if(this.state.position||this.state.blockedReason||!['EUR_USD','GBP_USD'].includes(symbol)||this.risk.locked())return
+  // Only gate fresh entries: existing Shadow positions still reconcile and retain exits.
+  if(!finalTrialAllowsNewEntry())return
   const account=await this.broker.account()
   this.risk.recordEquity(account.equity)
   const capital=D.min(new D(1000),new D(account.equity))
