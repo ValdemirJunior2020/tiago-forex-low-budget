@@ -62,6 +62,7 @@ export class OllamaPracticeMirror{
    tradeId:active?.tradeId??null,activeSymbol:active?.symbol??null,activeDirection:active?.direction??null,
    activeStatus:active?.status??null,brokerFillPrice:active?.fillPrice??null,
    mirroredStop:active?.stop??null,closedTrades:this.state.closed.length,
+   newEntriesEnabled:env.OLLAMA_NEW_ENTRIES_ENABLED==='true',
    brokerOpenPL:active?.tradeId?this.state.brokerOpenPL??null:null,
    brokerOpenPLAt:active?.tradeId?this.state.brokerOpenPLAt??null:null,
    realizedPL:totals.toFixed(2),history:this.state.closed.slice(-8).reverse(),
@@ -148,6 +149,13 @@ export class OllamaPracticeMirror{
   }
   // The key is consumed BEFORE network requests, including preflight failures.
   this.state.lastSeenSignalKey=k;this.save()
+  // Final trial: Shadow-only new entries. Existing Ollama trades are reconciled above.
+  if(env.OLLAMA_NEW_ENTRIES_ENABLED!=='true'){
+   this.state.status='SHADOW_ONLY_RESEARCH'
+   this.state.lastError=null
+   this.note('OLLAMA_NEW_ENTRY_PAUSED','Final trial: Ollama analysis remains available; no new Ollama order sent')
+   return
+  }
   if(!isOandaForexSessionOpen(this.now())){
    this.state.status='MARKET_CLOSED'
    this.state.lastError='OANDA FX market is closed: fresh signals are not sent outside the trading session.'
