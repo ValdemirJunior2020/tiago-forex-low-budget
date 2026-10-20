@@ -8,6 +8,7 @@ import {OllamaPracticeBroker,ollamaClientId,isTagged,OLLAMA_TRADE_TAG} from '../
 import type{OpenSpec}from '../broker/OllamaPracticeBroker.js'
 import type{BrokerSignal}from './OllamaSignalEngine.js'
 import{oandaForexSession,isOandaForexSessionOpen}from '../broker/OandaMarketHours.js'
+import {finalTrialAllowsNewEntry} from './FinalTrialWindow.js'
 
 export type PaperView={lastBrokerSignal?:BrokerSignal|null}
 type ShadowView={position?:{symbol:string}|null;pendingMirrorCloseTradeId?:string|null}
@@ -62,7 +63,7 @@ export class OllamaPracticeMirror{
    tradeId:active?.tradeId??null,activeSymbol:active?.symbol??null,activeDirection:active?.direction??null,
    activeStatus:active?.status??null,brokerFillPrice:active?.fillPrice??null,
    mirroredStop:active?.stop??null,closedTrades:this.state.closed.length,
-   newEntriesEnabled:env.OLLAMA_NEW_ENTRIES_ENABLED==='true',
+   newEntriesEnabled:env.OLLAMA_NEW_ENTRIES_ENABLED==='true'&&finalTrialAllowsNewEntry(this.now()),
    brokerOpenPL:active?.tradeId?this.state.brokerOpenPL??null:null,
    brokerOpenPLAt:active?.tradeId?this.state.brokerOpenPLAt??null:null,
    realizedPL:totals.toFixed(2),history:this.state.closed.slice(-8).reverse(),
@@ -150,7 +151,7 @@ export class OllamaPracticeMirror{
   // The key is consumed BEFORE network requests, including preflight failures.
   this.state.lastSeenSignalKey=k;this.save()
   // Final trial: Shadow-only new entries. Existing Ollama trades are reconciled above.
-  if(env.OLLAMA_NEW_ENTRIES_ENABLED!=='true'){
+  if(env.OLLAMA_NEW_ENTRIES_ENABLED!=='true'||!finalTrialAllowsNewEntry(this.now())){
    this.state.status='SHADOW_ONLY_RESEARCH'
    this.state.lastError=null
    this.note('OLLAMA_NEW_ENTRY_PAUSED','Final trial: Ollama analysis remains available; no new Ollama order sent')
