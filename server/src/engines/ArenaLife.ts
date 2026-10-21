@@ -14,7 +14,7 @@ export function updateForecasts(state:SurvivalState,current:{time:string;close:n
   const agent=next.agents[f.id]
   if(!agent||agent.energy<=0)continue
   const prior=agent.forecast
-  if(prior&&prior.candleTime!==current.time&&prior.lastJudged!==current.time){
+  if(prior&&prior.candleTime!==current.time&&agent.lastJudged!==current.time){
    const change=current.close-prior.close
    // The magnitude threshold avoids rewarding tiny price movement or spread noise.
    const threshold=prior.close*0.00003
