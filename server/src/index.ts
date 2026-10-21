@@ -13,9 +13,10 @@ import{Decimal}from'decimal.js'
 import {openVikingBridge} from './engines/OpenVikingBridge.js'
 import {oandaAuthGate} from './broker/OandaAuthGate.js'
 import {oandaAvailabilityGate} from './broker/OandaAvailabilityGate.js'
+import {SurvivalArena} from './engines/SurvivalArena.js'
 
 const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowBrokerFirst(broker),
- ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot())
+ ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot()),arena=new SurvivalArena(broker)
 
 app.use(helmet())
 app.use(cors({origin:env.CLIENT_ORIGIN}))
@@ -42,6 +43,8 @@ app.get('/health',async(_q,res)=>{
     engines:{shadow:'OANDA_PRACTICE',ollama:'OANDA_PRACTICE',shadowRiskState:'LOCAL_NOT_A_PROFIT_SOURCE'}
   })
 })
+
+app.get('/api/survival-arena',async(_q,res)=>res.json(await arena.snapshot()))
 
 app.get('/api/openviking',async(_q,res)=>res.json(await openVikingBridge.health()))
 
