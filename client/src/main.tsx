@@ -361,7 +361,7 @@ function App(){
             <span>{lang==='pt'?'MESMA CONTA • TRADE ID ISOLADO':'SAME ACCOUNT • SEPARATE TRADE ID'}</span>
           </div>
           {ollamaMirror?.newEntriesEnabled===false&&<p className="ollama-oanda-warning">
-            {lang==='pt'?'TESTE FINAL: apenas o Shadow 3/4 abre novas operações. O Ollama segue em análise e acompanha trades existentes. Novas entradas encerram automaticamente após 21/10/2026 (ET).':'FINAL TRIAL: only Shadow 3/4 may open new trades. Ollama continues research and tracks existing trades. New entries end after Oct 21, 2026 (ET).'}
+            {lang==='pt'?'TESTE FINAL: apenas o Shadow 3/4 abre novas operações. O Ollama segue em análise e acompanha trades existentes. Novas entradas encerram automaticamente após 23/10/2026 (ET).':'FINAL TRIAL: only Shadow 3/4 may open new trades. Ollama continues research and tracks existing trades. New entries end after Oct 23, 2026 (ET).'}
           </p>}
           <div className="ollama-oanda-values">
             <div><small>{lang==='pt'?'P/L REALIZADO NA OANDA':'REALIZED OANDA P/L'}</small><strong>{ollamaMirror?.source==='OANDA_API'?signedMoney(ollamaMirror.realizedPL):'—'}</strong></div>
