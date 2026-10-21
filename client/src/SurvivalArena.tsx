@@ -1,14 +1,14 @@
 import React,{useEffect,useState} from 'react'
 import './SurvivalArena.css'
 type Side='BUY'|'SELL'|'WAIT'
-type Agent={id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;realizedPL:number|null;status:string}
+type Agent={id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct?:number;wrong?:number;realizedPL:number|null;status:string}
 type Note={from:string;to:string;message:string}
 type Snapshot={source:string;updatedAt:string|null;status:string;agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
 const fallback=[
  ['atlas','Atlas','Tendência','#46cfa9'],['nova','Nova','Reversão','#b792ff'],
  ['pixel','Pixel','Volume','#ffc36f'],['sage','Sage','Proteção','#6db5fc'],
  ['echo','Echo','Consenso','#fb8bb7']
-].map(([id,name,role,accent])=>({id,name,role,accent,side:'WAIT' as Side,reason:'Aguardando OANDA',confidence:0,life:null,realizedPL:null,status:'RESEARCH_ONLY'}))
+].map(([id,name,role,accent])=>({id,name,role,accent,side:'WAIT' as Side,reason:'Aguardando OANDA',confidence:0,life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
 const desks=[{x:274,y:252},{x:500,y:208},{x:725,y:276},{x:368,y:480},{x:632,y:482}]
 function Desk({x,y,accent}:{x:number;y:number;accent:string}){
  return <g transform={`translate(${x} ${y})`}>
@@ -102,7 +102,7 @@ export default function SurvivalArena(){
     <div className="arena-world-bottom">
      <span className="arena-activity-dot"/><span>{note?`${note.from} → ${note.to}: ${note.message}`:'Aguardando análises colaborativas da OANDA...'}</span>
     </div>
-    {showHelp&&<div className="arena-help">Os cinco personagens representam pesquisas diferentes sobre os mesmos candles completos da OANDA. Eles trocam conclusões no painel de conversas. Nenhum personagem executa ordens. A vida e o lucro individual permanecem indisponíveis até existirem resultados oficiais atribuídos a cada agente. O Shadow 3/4 continua separado.</div>}
+    {showHelp&&<div className="arena-help">Os cinco personagens representam pesquisas diferentes sobre os mesmos candles completos da OANDA. Eles trocam conclusões no painel de conversas. Nenhum personagem executa ordens. A energia de sobrevivência muda apenas após a chegada do próximo candle completo da OANDA. É avaliação de previsões, não lucro. O P/L individual permanece indisponível. O Shadow 3/4 continua separado.</div>}
    </div>
    <aside className="arena-side">
     <div className="arena-panel">
@@ -110,7 +110,7 @@ export default function SurvivalArena(){
      {agents.map(a=><button key={a.id} className={'arena-agent-row'+(picked.id===a.id?' on':'')} onClick={()=>setSelected(a.id)}>
       <span className="arena-face" style={{background:a.accent}}>{a.name[0]}</span>
       <span className="arena-agent-text"><b>{a.name}</b><small>{a.role}</small></span>
-      <span className={'arena-signal '+a.side.toLowerCase()}>{a.side}</span>
+      <span className={'arena-signal '+a.side.toLowerCase()}>{a.status==='ELIMINATED'?'ELIMINADO':a.side}</span>
      </button>)}
     </div>
     <div className="arena-panel">
@@ -119,9 +119,11 @@ export default function SurvivalArena(){
      <p>{picked.reason}</p>
      <div className="arena-detail-line"><span>Decisão analítica</span><b>{picked.side}</b></div>
      <div className="arena-detail-line"><span>Confiança heurística</span><b>{picked.confidence}%</b></div>
-     <div className="arena-detail-line"><span>Vida financeira</span><b>—</b></div>
+     <div className="arena-detail-line"><span>Energia de sobrevivência</span><b>{picked.life==null?'—':picked.life+' / 100'}</b></div>
+     <div className="arena-energy"><div style={{width:(picked.life??0)+'%',background:picked.accent}}/></div>
+     <div className="arena-detail-line"><span>Acertos / erros observados</span><b>{picked.correct??0} / {picked.wrong??0}</b></div>
      <div className="arena-detail-line"><span>P/L individual</span><b>—</b></div>
-     <small>Sem trades OANDA atribuídos individualmente; nenhum resultado fabricado.</small>
+     <small>Energia mede previsões contra o candle seguinte (não é lucro). Sem trades OANDA atribuídos individualmente, P/L é indisponível.</small>
     </div>
     <div className="arena-panel"><div className="arena-side-title">CONVERSAS DA EQUIPE</div>
      <div className="arena-chat">{notes.length?notes.map((n,i)=><div className="arena-chat-message" key={i}><strong>{n.from} → {n.to}</strong><span>{n.message}</span></div>):<p>Aguardando dados oficiais da OANDA.</p>}</div>
