@@ -6,6 +6,7 @@ import{
   Sparkles,Target,WalletCards,Wifi,WifiOff
 }from'lucide-react'
 import OllamaChartLab from './OllamaChartLab'
+import SurvivalArena from './SurvivalArena'
 import'./styles.css'
 
 type Lang='en'|'pt'
@@ -165,6 +166,7 @@ function App(){
         </div>
       </header>
 
+      <SurvivalArena/>
       <section className="status-strip">
         <div><span className={health?.broker?'signal good':'signal bad'}>{health?.broker?<Wifi size={15}/>:<WifiOff size={15}/>}</span><small>{x.broker}</small><b>{health?.broker?x.online:x.offline}</b></div>
         <div><span className={health?.ollama?'signal good':'signal bad'}><BrainCircuit size={15}/></span><small>{x.ollama}</small><b>{health?.ollama?x.online:x.offline}</b></div>
