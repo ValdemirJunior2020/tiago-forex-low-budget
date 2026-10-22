@@ -28,7 +28,7 @@ function uniqueId(id:AgentId,candle:string){return 'SV_'+id.toUpperCase()+'_'+cr
 export function chooseCompetitor(agents:{id:string;side:Side;confidence:number}[],
  results:{id:string;status:string;days:{date:string;met:boolean|null}[]}[],
  lastAttempt:Record<string,string>,candle:string,day:string):AgentId|null{
- for(const id of ids){
+ for(const id of [...ids].sort((a,b)=>(lastAttempt[a]??'').localeCompare(lastAttempt[b]??''))){
   const a=agents.find(x=>x.id===id),r=results.find(x=>x.id===id)
   if(!a||!r||r.status==='ELIMINATED'||r.status==='SURVIVED'||a.side==='WAIT')continue
   if(r.days.find(x=>x.date===day)?.met===true)continue
