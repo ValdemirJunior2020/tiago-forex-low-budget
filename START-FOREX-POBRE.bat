@@ -48,7 +48,7 @@ if not errorlevel 1 (
  exit /b 0
 )
 echo [NEAT] Instalando biblioteca neat-python no Python local...
-py -3 -m pip install --disable-pip-version-check "neat-python>=2.1,<3"
+py -3 -m pip install --disable-pip-version-check "neat-python==2.0.0"
 if errorlevel 1 (
  echo [NEAT] Instalacao falhou; Forex-Pobre continuara sem modelos NEAT.
  exit /b 0
