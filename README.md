@@ -45,3 +45,49 @@ Lessons go to account-isolated `viking://resources/forex-pobre-<account hash>/tr
 Only *closed, OANDA-attributed Shadow trades* are sent; no token, account number, or unverified local
 paper profits are exported. The local verified OANDA study and six historical charts keep working
 without OpenViking, and a disconnected OpenViking cannot prevent or trigger broker orders.
+
+## Survival Arena — 5 independent OANDA Practice competitors (22–23 Oct 2026)
+
+Five competitors — Atlas (trend), Nova (reversal), Pixel (activity), Sage (protection),
+Echo (independent 12-candle breakout) — can **individually** request an OANDA Practice
+order. Their consultation and separate memories remain on the dashboard, but no
+coordinator may order on another bot's behalf. A single central guard serializes
+requests and enforces the original shared constraints.
+
+**Local opt-in**, in your **own** `.env` only:
+
+```dotenv
+LOW_BUDGET_TRADING_ENABLED=true
+SURVIVAL_TRADING_ENABLED=true
+OANDA_DEMO_MIRROR_ENABLED=false
+OLLAMA_OANDA_PRACTICE_MIRROR_ENABLED=false
+OLLAMA_NEW_ENTRIES_ENABLED=false
+```
+
+The account ID must match `LOW_BUDGET_ALLOWED_ACCOUNT_ID`, and your token remains local.
+Never add the real token to Git. Start by verifying the Practice account and any
+existing open positions and attached stops on OANDA. The 5 agents are disabled by
+default. Changing `.env` requires restarting the local server.
+
+- Every accepted order has unique `SV_<AGENT>_<HASH>` client ID and
+  `SURVIVAL_<AGENT>` OANDA trade tag; results count **only** if the OANDA
+  confirms a closed trade with that owner.
+- The central `LowBudgetGuard` remains in force: <=$2.50 risk per trade,
+  <=$5 shared stop exposure, <=$200 margin, <=$10,000 notional, quote/slippage
+  and drawdown checks. Only one account trade at a time during an agent entry.
+- Stops and take-profits are attached **on fill**. A missing response or ambiguous
+  OANDA order is **not retried**. Its intent is stored in
+  `data/survival-execution-state.json` and later reconciled against OANDA.
+  Unresolved mismatches block further submissions; never delete this file
+  while trades may still be open.
+- Each bot needs >=$1 net OANDA realized P/L on **each** of October 22 and 23
+  (America/New_York). At the end of a day it is eliminated if the verified
+  result is below target, including zero confirmed fills. An OANDA outage
+  prevents a false elimination. Winners cannot force higher risk to win.
+- All new entries stop automatically at **Oct 24 00:00 EDT**.
+  Open positions are not force-closed on cutoff; check broker stops on OANDA.
+- The Shadow 3/4 algorithm is unchanged, as is the separate Original repository.
+  The Survival bots are enabled only by the independent opt-in switches above.
+- Status: `/api/survival-arena` and `/api/survival-execution`.
+  Broker operations are **not** guaranteed profitable. The tests verify logic
+  with mocked scenarios, not the user's live account connectivity.
