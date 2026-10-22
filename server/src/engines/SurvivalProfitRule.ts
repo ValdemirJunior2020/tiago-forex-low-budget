@@ -9,7 +9,7 @@ export function floridaDay(iso:string):string|null{
  const d=new Date(iso);if(!Number.isFinite(d.getTime()))return null
  return new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(d)
 }
-export function evaluateSurvival(id:string,trades:ClosedTrade[],now:Date=new Date()):AgentChallenge{
+export function evaluateSurvival(id:string,trades:ClosedTrade[],now:Date=new Date(),brokerCoverageVerified=false):AgentChallenge{
  // Explicit namespace prevents old Shadow and independent Ollama trades being misattributed.
  const tagged=trades.filter(t=>t.clientExtensions?.tag===`SURVIVAL_${id.toUpperCase()}`)
  const today=floridaDay(now.toISOString())!
@@ -19,8 +19,11 @@ export function evaluateSurvival(id:string,trades:ClosedTrade[],now:Date=new Dat
   const usd=Math.round(own.reduce((sum,t)=>sum+Number(t.realizedPL),0)*100)/100
   return {date,realizedPL:usd,met:usd>=DAILY_TARGET_USD,tradeCount:own.length}
  })
- // Never declare a financial elimination merely from a lack of broker evidence.
- if(!tagged.length)return{id,days,status:'AWAITING_AGENT_BROKER_TRADES'}
+ // No OANDA response means no trustworthy elimination, even if calendar day ended.
+ if(!brokerCoverageVerified&&!tagged.length)return{id,days,status:'AWAITING_AGENT_BROKER_TRADES'}
+ // After a completed Florida day, a verified $0 (no tagged trades) also fails the goal.
+ if(brokerCoverageVerified&&days.some(d=>d.date<today&&(d.realizedPL??0)<DAILY_TARGET_USD))
+  return{id,days,status:'ELIMINATED'}
  if(days.every(d=>d.met===true))return{id,days,status:'SURVIVED'}
  // A completed challenge day with verified trades below target ends the trial.
  if(days.some(d=>d.date<today&&d.met===false))return{id,days,status:'ELIMINATED'}
