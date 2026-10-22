@@ -11,6 +11,17 @@ const fallback=[
  ['echo','Echo','Consenso','#fb8bb7']
 ].map(([id,name,role,accent])=>({id,name,role,accent,side:'WAIT' as Side,reason:'Aguardando OANDA',confidence:0,life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
 const desks=[{x:274,y:252},{x:500,y:208},{x:725,y:276},{x:368,y:480},{x:632,y:482}]
+
+// Individual walking routes use SVG native transforms so characters really
+// travel between desks (not just bob in place). Purely visual: no fake orders.
+const walkingRoutes=[
+ '0 0; 25 5; 72 25; 102 65; 82 75; 30 30; 0 0; 0 0',
+ '0 0; -25 16; -65 52; -96 92; -65 52; -15 22; 0 0; 0 0',
+ '0 0; -26 16; -80 38; -122 82; -86 65; -28 18; 0 0; 0 0',
+ '0 0; 24 -18; 65 -52; 90 -76; 62 -45; 18 -12; 0 0; 0 0',
+ '0 0; -24 -16; -68 -45; -103 -82; -72 -45; -24 -12; 0 0; 0 0'
+]
+
 function Desk({x,y,accent}:{x:number;y:number;accent:string}){
  return <g transform={`translate(${x} ${y})`}>
   <ellipse cx="4" cy="37" rx="86" ry="29" fill="#081322" opacity=".28"/>
@@ -27,8 +38,9 @@ function Desk({x,y,accent}:{x:number;y:number;accent:string}){
   <path d="M-28 0v-13" stroke="#99b5aa" strokeWidth="4"/>
  </g>
 }
-function Avatar({agent,x,y,chosen,onClick}:{agent:Agent;x:number;y:number;chosen:boolean;onClick:()=>void}){
+function Avatar({agent,x,y,chosen,onClick,index}:{agent:Agent;x:number;y:number;chosen:boolean;onClick:()=>void;index:number}){
  return <g onClick={onClick} className={'arena-avatar'+(chosen?' selected':'')} style={{cursor:'pointer'}}>
+  <animateTransform attributeName="transform" type="translate" values={walkingRoutes[index]} keyTimes="0;0.14;0.28;0.43;0.57;0.72;0.86;1" dur={`${17+index*2}s`} repeatCount="indefinite" calcMode="linear"/>
   <g className="arena-avatar-bob">
    <ellipse cx={x} cy={y+18} rx="22" ry="10" fill="#14222d" opacity=".35"/>
    {chosen&&<ellipse cx={x} cy={y+15} rx="28" ry="14" fill="none" stroke={agent.accent} strokeWidth="3"/>}
@@ -98,7 +110,7 @@ export default function SurvivalArena(){
      <g><rect x="108" y="327" width="95" height="56" rx="8" fill="#546578"/><rect x="116" y="335" width="78" height="41" rx="4" fill="#263c48"/><text x="155" y="360" fill="#7feacf" fontSize="12" textAnchor="middle">OANDA</text></g>
      <g><rect x="817" y="322" width="64" height="112" rx="4" fill="#708c92"/><rect x="827" y="332" width="45" height="54" rx="4" fill="#153c49"/><text x="849" y="360" textAnchor="middle" fill="#7ce6e3" fontSize="11">LIVE</text></g>
      {agents.map((a,i)=><Desk key={a.id} {...desks[i]} accent={a.accent}/>)}
-     {agents.map((a,i)=><Avatar key={a.id} agent={a} x={desks[i].x+16} y={desks[i].y+72} chosen={selected===a.id} onClick={()=>setSelected(a.id)}/>)}
+     {agents.map((a,i)=><Avatar key={a.id} agent={a} x={desks[i].x+16} y={desks[i].y+72} chosen={selected===a.id} onClick={()=>setSelected(a.id)} index={i}/>)}
      <g><rect x="345" y="585" width="321" height="44" rx="13" fill="#192c40" stroke="#75b7b3" strokeOpacity=".55"/><text x="505" y="612" textAnchor="middle" fontWeight="700" fill="#d5f4ee" fontSize="17">SURVIVAL OFFICE · OANDA PRACTICE</text></g>
     </svg>
     <div className="arena-world-bottom">
