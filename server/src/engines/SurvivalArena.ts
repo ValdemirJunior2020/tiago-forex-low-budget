@@ -58,7 +58,7 @@ export class SurvivalArena {
   for(const a of advice){
    const result=ledger.agents[a.id]
    if(result){a.life=result.energy as any;a.correct=result.correct;a.wrong=result.wrong;
-    a.status=result.energy<=0?'ELIMINATED':'RESEARCH_ONLY'}
+    a.status='RESEARCH_ONLY' // Forecast energy never determines financial survival.}
   }
   const messages=[
    {from:'Atlas',to:'Equipe',message:'Tendência: '+advice[0].side+' — '+advice[0].reason},
