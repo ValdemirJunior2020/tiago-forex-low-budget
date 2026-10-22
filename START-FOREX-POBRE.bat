@@ -35,7 +35,10 @@ call npm run verify
 if errorlevel 1 goto failed
 echo [OK] Build e testes passaram.
 call :ensure_neat
-call :ensure_neat
+call :ensure_local_services
+goto check_backend
+
+:ensure_neat
 echo [NEAT] Conferindo neuroevolucao Python local...
 where py >nul 2>nul
 if errorlevel 1 (
@@ -56,7 +59,7 @@ if errorlevel 1 (
 echo [OK] neat-python instalado.
 exit /b 0
 
-:ensure_local_services
+:check_backend
 netstat -ano | findstr /R /C:":8791 .*LISTENING" >nul
 if errorlevel 1 goto check_frontend
 echo [CHECK] Porta 8791 ja ocupada. Conferindo Forex-Pobre...
