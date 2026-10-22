@@ -1,5 +1,6 @@
 import type {OandaReadOnly} from '../broker/OandaReadOnly.js'
 import {SurvivalLedger} from './ArenaLife.js'
+import {ArenaTeamMemory} from './ArenaTeam.js'
 import {evaluateSurvival,type AgentChallenge} from './SurvivalProfitRule.js'
 
 type Side='BUY'|'SELL'|'WAIT'
@@ -29,11 +30,12 @@ function decide(id:string,bars:Candle[]):{side:Side;reason:string;confidence:num
   default:return{side:'WAIT',reason:'Aguardando sinais das outras mesas',confidence:0}
  }
 }
-type Snapshot={source:string;updatedAt:string|null;status:string;profitChallenge:AgentChallenge[];agents:Array<{id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct:number;wrong:number;realizedPL:null;status:string}>;messages:Array<{from:string;to:string;message:string}>;riskMessage:string;expiresAt:string}
+type Snapshot={source:string;updatedAt:string|null;status:string;profitChallenge:AgentChallenge[];team:{coordinator:ReturnType<ArenaTeamMemory['snapshot']>['decision'];agentMemoryCounts:Record<string,number>;lastCandle:string|null};agents:Array<{id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct:number;wrong:number;realizedPL:null;status:string}>;messages:Array<{from:string;to:string;message:string}>;riskMessage:string;expiresAt:string}
 const expiry='2026-10-24T04:00:00.000Z'
 export class SurvivalArena {
  private cache:{expires:number;data:Snapshot}|null=null
  private readonly ledger=new SurvivalLedger('data/survival-arena-life.json',profiles.map(p=>p.id))
+ private readonly team=new ArenaTeamMemory()
  private readonly empty=profiles.map(p=>({...p,side:'WAIT' as Side,reason:'Aguardando dados da OANDA',confidence:0,life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
  constructor(private readonly broker:Pick<OandaReadOnly,'candles'|'closedTrades'>){}
  async snapshot():Promise<Snapshot>{
@@ -42,9 +44,10 @@ export class SurvivalArena {
   let trades:Awaited<ReturnType<OandaReadOnly['closedTrades']>>=[]
   try{trades=await this.broker.closedTrades(250)}catch{/* P/L remains unavailable if broker cannot verify closed trades. */}
   const profitChallenge=profiles.map(p=>evaluateSurvival(p.id,trades))
+  const teamInfo=()=>{const m=this.team.snapshot();return {coordinator:m.decision,agentMemoryCounts:Object.fromEntries(profiles.map(p=>[p.id,m.agents[p.id]?.length??0])),lastCandle:m.lastCandle}}
   try{bars=await this.broker.candles('EUR_USD','M5',48)}
   catch{
-   return{source:'OANDA_UNAVAILABLE',updatedAt:null,status:'WAITING_FOR_OANDA',profitChallenge,agents:this.empty,
+   return{source:'OANDA_UNAVAILABLE',updatedAt:null,status:'WAITING_FOR_OANDA',profitChallenge,team:teamInfo(),agents:this.empty,
     messages:[],riskMessage:'OANDA indisponível: nenhuma decisão ou P/L estimado.',expiresAt:expiry}
   }
   const advice=profiles.map(p=>({...p,...decide(p.id,bars),life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
@@ -61,13 +64,13 @@ export class SurvivalArena {
     a.status='RESEARCH_ONLY' // Forecast energy never determines financial survival.
    }
   }
-  const messages=[
-   {from:'Atlas',to:'Equipe',message:'Tendência: '+advice[0].side+' — '+advice[0].reason},
-   {from:'Pixel',to:'Sage',message:'Volume: '+advice[2].side+'; '+advice[2].reason},
-   {from:'Sage',to:'Echo',message:'Risco: '+advice[3].side+'; entradas continuam bloqueadas nesta arena.'},
-   {from:'Echo',to:'Equipe',message:agreement==='WAIT'?'Precisamos de mais confirmação.':'Consenso analítico '+agreement+'; não é uma ordem.'}
-  ]
-  const data:Snapshot={source:'OANDA_COMPLETED_CANDLES',profitChallenge,updatedAt:bars.at(-1)?.time??null,status:bars.length>=30?'RESEARCH_ONLY':'INSUFFICIENT_DATA',agents:advice,
+  // Each desk writes a verifiable closed-candle briefing. Team hand-offs are
+  // deterministic and persisted; they are not fabricated LLM conversations.
+  if(candle&&bars.length>=30)this.team.record(candle.time,advice.map(a=>({
+   id:a.id,name:a.name,side:a.side,confidence:a.confidence,reason:a.reason
+  })))
+  const messages=this.team.snapshot().messages.slice(-8).map(m=>({from:m.from,to:m.to,message:m.message}))
+  const data:Snapshot={source:'OANDA_COMPLETED_CANDLES',profitChallenge,team:teamInfo(),updatedAt:bars.at(-1)?.time??null,status:bars.length>=30?'RESEARCH_ONLY':'INSUFFICIENT_DATA',agents:advice,
    messages,riskMessage:'Cinco agentes colaboram em modo pesquisa. Nenhum envia ordens. Regra de sobrevivência financeira: cada bot precisa de US$1 líquido realizado em 22 e 23/10, confirmado por trades OANDA com identificação individual. Energia de previsão não conta como lucro.',expiresAt:expiry}
   this.cache={expires:Date.now()+60000,data}
   return data
