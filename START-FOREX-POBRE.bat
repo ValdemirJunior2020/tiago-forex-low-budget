@@ -34,7 +34,29 @@ echo [BUILD] Conferindo build e testes...
 call npm run verify
 if errorlevel 1 goto failed
 echo [OK] Build e testes passaram.
-call :ensure_local_services
+call :ensure_neat
+call :ensure_neat
+echo [NEAT] Conferindo neuroevolucao Python local...
+where py >nul 2>nul
+if errorlevel 1 (
+ echo [NEAT] Python Launcher nao encontrado. Research NEAT ficara indisponivel.
+ exit /b 0
+)
+py -3 -c "import neat" >nul 2>nul
+if not errorlevel 1 (
+ echo [OK] neat-python ja instalado.
+ exit /b 0
+)
+echo [NEAT] Instalando biblioteca neat-python no Python local...
+py -3 -m pip install --disable-pip-version-check "neat-python>=2.1,<3"
+if errorlevel 1 (
+ echo [NEAT] Instalacao falhou; Forex-Pobre continuara sem modelos NEAT.
+ exit /b 0
+)
+echo [OK] neat-python instalado.
+exit /b 0
+
+:ensure_local_services
 netstat -ano | findstr /R /C:":8791 .*LISTENING" >nul
 if errorlevel 1 goto check_frontend
 echo [CHECK] Porta 8791 ja ocupada. Conferindo Forex-Pobre...
