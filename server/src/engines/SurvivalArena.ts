@@ -48,8 +48,9 @@ export class SurvivalArena {
   if(this.cache&&Date.now()<this.cache.expires)return this.cache.data
   let bars:Candle[]=[]
   let trades:Awaited<ReturnType<OandaReadOnly['closedTrades']>>=[]
-  try{trades=await this.broker.closedTrades(250)}catch{/* P/L remains unavailable if broker cannot verify closed trades. */}
-  const profitChallenge=profiles.map(p=>evaluateSurvival(p.id,trades))
+  let verifiedBrokerHistory=false
+  try{trades=await this.broker.closedTrades(250);verifiedBrokerHistory=true}catch{/* P/L remains unavailable if broker cannot verify closed trades. */}
+  const profitChallenge=profiles.map(p=>evaluateSurvival(p.id,trades,new Date(),verifiedBrokerHistory))
   const teamInfo=()=>{const m=this.team.snapshot();return {coordinator:m.decision,agentMemoryCounts:Object.fromEntries(profiles.map(p=>[p.id,m.agents[p.id]?.length??0])),lastCandle:m.lastCandle}}
   try{bars=await this.broker.candles('EUR_USD','M5',48)}
   catch{
