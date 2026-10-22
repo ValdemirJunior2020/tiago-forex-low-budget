@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url'
 type Spec={symbol:string;direction:'long'|'short';units:string;stop:string;referencePrice:string}
 export const SHADOW_TAG='FOREX_POBRE_SHADOW'
 export const OLLAMA_TAG='FOREX_POBRE_OLLAMA'
+export const isSurvivalTag=(tag:string)=>/^SURVIVAL_(ATLAS|NOVA|PIXEL|SAGE|ECHO)$/.test(tag)
 export class LowBudgetGuard {
  private tail:Promise<void>=Promise.resolve()
  private risk=new RiskManager(resolve(dirname(fileURLToPath(import.meta.url)),'../../../data/low-budget-broker-equity.json'))
@@ -36,7 +37,7 @@ export class LowBudgetGuard {
   const {account,trades}=await this.snapshot()
   if(!['EUR_USD','GBP_USD'].includes(s.symbol))throw Error('Unsupported USD major')
   if(trades.some(t=>t.instrument===s.symbol))throw Error('INSTRUMENT_OCCUPIED')
-  if(trades.some(t=>![SHADOW_TAG,OLLAMA_TAG].includes(t.clientExtensions?.tag||'')))throw Error('UNKNOWN_OANDA_POSITION')
+  if(trades.some(t=>![SHADOW_TAG,OLLAMA_TAG].includes(t.clientExtensions?.tag||'')&&!isSurvivalTag(t.clientExtensions?.tag||'')))throw Error('UNKNOWN_OANDA_POSITION')
   const u=new D(s.units),ref=new D(s.referencePrice),stop=new D(s.stop)
   if(!u.isInteger()||u.lte(0)||!ref.isFinite()||ref.lte(0)||!stop.isFinite())throw Error('Invalid order')
   const accountPath='/v3/accounts/'+encodeURIComponent(env.OANDA_ACCOUNT_ID)
