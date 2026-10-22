@@ -163,6 +163,12 @@ export class OandaReadOnly{
   }
  }
  // Confirmed closed-trade data comes only from OANDA, never from local paper P/L.
+ async allTrades(count=250):Promise<Array<{id:string;state:string;instrument:string;stopLossOrder?:{price?:string};clientExtensions?:{id?:string;tag?:string}}>>{
+  const limit=Math.max(1,Math.min(250,Math.floor(count)))
+  const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades?state=ALL&count=${limit}`)
+  if(!Array.isArray(b.trades))throw Error('OANDA_ALL_TRADES_UNAVAILABLE')
+  return b.trades
+ }
  async closedTrades(count=100){
   const limit=Math.max(1,Math.min(250,Math.floor(count)))
   const b=await this.get(`/v3/accounts/${env.OANDA_ACCOUNT_ID}/trades?state=CLOSED&count=${limit}`)
