@@ -1,5 +1,6 @@
 import type {OandaReadOnly} from '../broker/OandaReadOnly.js'
 import {SurvivalLedger} from './ArenaLife.js'
+import {evaluateSurvival,type AgentChallenge} from './SurvivalProfitRule.js'
 
 type Side='BUY'|'SELL'|'WAIT'
 type Candle={time:string;open:number;high:number;low:number;close:number;volume:number}
@@ -28,19 +29,22 @@ function decide(id:string,bars:Candle[]):{side:Side;reason:string;confidence:num
   default:return{side:'WAIT',reason:'Aguardando sinais das outras mesas',confidence:0}
  }
 }
-type Snapshot={source:string;updatedAt:string|null;status:string;agents:Array<{id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct:number;wrong:number;realizedPL:null;status:string}>;messages:Array<{from:string;to:string;message:string}>;riskMessage:string;expiresAt:string}
+type Snapshot={source:string;updatedAt:string|null;status:string;profitChallenge:AgentChallenge[];agents:Array<{id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct:number;wrong:number;realizedPL:null;status:string}>;messages:Array<{from:string;to:string;message:string}>;riskMessage:string;expiresAt:string}
 const expiry='2026-10-24T04:00:00.000Z'
 export class SurvivalArena {
  private cache:{expires:number;data:Snapshot}|null=null
  private readonly ledger=new SurvivalLedger('data/survival-arena-life.json',profiles.map(p=>p.id))
  private readonly empty=profiles.map(p=>({...p,side:'WAIT' as Side,reason:'Aguardando dados da OANDA',confidence:0,life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
- constructor(private readonly broker:Pick<OandaReadOnly,'candles'>){}
+ constructor(private readonly broker:Pick<OandaReadOnly,'candles'|'closedTrades'>){}
  async snapshot():Promise<Snapshot>{
   if(this.cache&&Date.now()<this.cache.expires)return this.cache.data
   let bars:Candle[]=[]
+  let trades:Awaited<ReturnType<OandaReadOnly['closedTrades']>>=[]
+  try{trades=await this.broker.closedTrades(250)}catch{/* P/L remains unavailable if broker cannot verify closed trades. */}
+  const profitChallenge=profiles.map(p=>evaluateSurvival(p.id,trades))
   try{bars=await this.broker.candles('EUR_USD','M5',48)}
   catch{
-   return{source:'OANDA_UNAVAILABLE',updatedAt:null,status:'WAITING_FOR_OANDA',agents:this.empty,
+   return{source:'OANDA_UNAVAILABLE',updatedAt:null,status:'WAITING_FOR_OANDA',profitChallenge,agents:this.empty,
     messages:[],riskMessage:'OANDA indisponível: nenhuma decisão ou P/L estimado.',expiresAt:expiry}
   }
   const advice=profiles.map(p=>({...p,...decide(p.id,bars),life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
@@ -62,8 +66,8 @@ export class SurvivalArena {
    {from:'Sage',to:'Echo',message:'Risco: '+advice[3].side+'; entradas continuam bloqueadas nesta arena.'},
    {from:'Echo',to:'Equipe',message:agreement==='WAIT'?'Precisamos de mais confirmação.':'Consenso analítico '+agreement+'; não é uma ordem.'}
   ]
-  const data:Snapshot={source:'OANDA_COMPLETED_CANDLES',updatedAt:bars.at(-1)?.time??null,status:bars.length>=30?'RESEARCH_ONLY':'INSUFFICIENT_DATA',agents:advice,
-   messages,riskMessage:'Cinco agentes colaboram em modo pesquisa. Nenhum envia ordens. Energia é pontuação por acertos e erros de previsão confirmados pelo candle seguinte, não dinheiro. P/L individual indisponível sem trades OANDA atribuídos.',expiresAt:expiry}
+  const data:Snapshot={source:'OANDA_COMPLETED_CANDLES',profitChallenge,updatedAt:bars.at(-1)?.time??null,status:bars.length>=30?'RESEARCH_ONLY':'INSUFFICIENT_DATA',agents:advice,
+   messages,riskMessage:'Cinco agentes colaboram em modo pesquisa. Nenhum envia ordens. Regra de sobrevivência financeira: cada bot precisa de US$1 líquido realizado em 22 e 23/10, confirmado por trades OANDA com identificação individual. Energia de previsão não conta como lucro.',expiresAt:expiry}
   this.cache={expires:Date.now()+60000,data}
   return data
  }
