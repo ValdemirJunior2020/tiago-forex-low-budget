@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react'
 import './SurvivalArena.css'
 type Side='BUY'|'SELL'|'WAIT'
+type NeatStatus={status:string;error:string|null;trainedAt:string|null;predictions:Record<string,{side:Side;confidence:number;status:string;validation:{fitness:number;signals:number;sampleCount:number}}>}
 type Agent={id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct?:number;wrong?:number;realizedPL:number|null;status:string}
 type Note={from:string;to:string;message:string}
 type Challenge={id:string;status:string;days:Array<{date:string;realizedPL:number|null;met:boolean|null;tradeCount:number}>}
@@ -59,13 +60,15 @@ function Avatar({agent,x,y,chosen,onClick,index}:{agent:Agent;x:number;y:number;
 }
 export default function SurvivalArena(){
  const[data,setData]=useState<Snapshot|null>(null)
+ const[neat,setNeat]=useState<NeatStatus|null>(null)
  const[selected,setSelected]=useState('atlas')
  const[activity,setActivity]=useState(0)
  const[showHelp,setShowHelp]=useState(false)
  useEffect(()=>{
   let active=true
   const load=()=>fetch('/api/survival-arena').then(r=>{if(!r.ok)throw Error('OANDA offline');return r.json()}).then(x=>{if(active)setData(x)}).catch(()=>{if(active)setData(null)})
-  load();const id=setInterval(load,30000)
+  const loadNeat=()=>fetch('/api/neat').then(r=>r.json()).then(x=>{if(active)setNeat(x)}).catch(()=>{if(active)setNeat(null)})
+  load();loadNeat();const id=setInterval(()=>{load();loadNeat()},30000)
   const talk=setInterval(()=>setActivity(n=>n+1),4500)
   return()=>{active=false;clearInterval(id);clearInterval(talk)}
  },[])
@@ -73,6 +76,7 @@ export default function SurvivalArena(){
  const picked=agents.find(a=>a.id===selected)??agents[0]
  const financial=data?.profitChallenge?.find(c=>c.id===picked.id)
  const coordinator=data?.team?.coordinator
+ const evolved=neat?.predictions?.[picked.id]
  const notes=data?.messages??[]
  const note=notes.length?notes[activity%notes.length]:null
  return <section className="arena-page" aria-label="TIAGO Survival Arena">
@@ -150,6 +154,14 @@ export default function SurvivalArena(){
      <div className="arena-detail-line"><span>Votos BUY / SELL / WAIT</span><b>{coordinator?`${coordinator.votes.buy} / ${coordinator.votes.sell} / ${coordinator.votes.wait}`:'—'}</b></div>
      <p>{coordinator?.reason??'Aguardando candles completos da OANDA para coordenar os agentes.'}</p>
      <small>O coordenador compartilha pesquisas e registra decisões, mas não envia ordens.</small>
+    </div>
+    <div className="arena-panel"><div className="arena-side-title">NEAT • EVOLUÇÃO NEURAL <span>PESQUISA</span></div>
+     <div className="arena-detail-line"><span>Motor local</span><b>{neat?.status??'AGUARDANDO'}</b></div>
+     <div className="arena-detail-line"><span>Bot selecionado</span><b>{picked.name}</b></div>
+     <div className="arena-detail-line"><span>Sinal neural independente</span><b>{evolved?.side??'—'}</b></div>
+     <div className="arena-detail-line"><span>Acertos / sinais na validação</span><b>{evolved?.validation?evolved.validation.signals+' sinais, '+evolved.validation.fitness.toFixed(1)+' pontos':'—'}</b></div>
+     <small>Redes realmente treinadas com neat-python e candles fechados OANDA. Pontuação de pesquisa NÃO é lucro. Sinais neurais não enviam ordens; as operações atuais permanecem nas estratégias fixas até validação.</small>
+     {neat?.error&&<p>{neat.error}</p>}
     </div>
     <div className="arena-panel"><div className="arena-side-title">CONVERSAS DA EQUIPE <span>REGISTROS REAIS</span></div>
      <div className="arena-chat">{notes.length?notes.map((n,i)=><div className="arena-chat-message" key={i}><strong>{n.from} → {n.to}</strong><span>{n.message}</span></div>):<p>Aguardando dados oficiais da OANDA.</p>}</div>
