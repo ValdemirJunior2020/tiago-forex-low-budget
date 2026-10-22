@@ -24,6 +24,11 @@ describe('two-day survival challenge: $1 net verified each Florida day',()=>{
   const result=evaluateSurvival('atlas',[t('1','2026-10-22T16:00:00Z','0.99')],new Date('2026-10-23T04:01:00Z'))
   expect(result.status).toBe('ELIMINATED')
  })
+ it('eliminates a bot with zero trades after completed day only if OANDA history was verified',()=>{
+  const at=new Date('2026-10-23T04:05:00Z')
+  expect(evaluateSurvival('atlas',[],at,true).status).toBe('ELIMINATED')
+  expect(evaluateSurvival('atlas',[],at,false).status).toBe('AWAITING_AGENT_BROKER_TRADES')
+ })
  it('keeps below-target bot in progress until its day ends',()=>{
   const result=evaluateSurvival('atlas',[t('1','2026-10-22T16:00:00Z','-0.25')],new Date('2026-10-22T20:00:00Z'))
   expect(result.status).toBe('IN_PROGRESS')
