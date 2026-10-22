@@ -64,12 +64,55 @@ export class ShadowBrokerFirst {
   if(!t||t.clientExtensions?.tag!==SHADOW_TAG||t.instrument!==p.symbol)throw Error('SHADOW_OANDA_OWNERSHIP_MISMATCH')
   return t
  }
+ // Restore only an unambiguous broker-owned Shadow position after a lost
+ // local state file. Never attach to Ollama, Survival or manual trades.
+ private recoverShadowPosition(open:any[]):boolean{
+  if(this.state.position)return false
+  const owned=open.filter(t=>t.clientExtensions?.tag===SHADOW_TAG)
+  if(owned.length===0){
+   if(this.state.blockedReason==='SHADOW_OANDA_POSITION_WITHOUT_LOCAL_STATE'){
+    this.state.blockedReason=null
+    this.state.lastAction={type:'SHADOW_BROKER_STATE_CLEARED',at:new Date().toISOString()}
+    this.save()
+    logShadowTrade({event:'SHADOW_BROKER_STATE_CLEARED',source:'OANDA_API'})
+   }
+   return false
+  }
+  if(owned.length!==1){
+   this.state.blockedReason='SHADOW_MULTIPLE_BROKER_POSITIONS_MANUAL_REVIEW'
+   this.save()
+   return false
+  }
+  const t=owned[0]
+  const units=new D(String(t.currentUnits))
+  const entry=new D(String(t.price))
+  const stop=new D(String(t.stopLossOrder?.price))
+  const direction:Side=units.gt(0)?'long':'short'
+  const stopValid=direction==='long'?stop.lt(entry):stop.gt(entry)
+  if(!/^\\d+$/.test(String(t.id))||!['EUR_USD','GBP_USD'].includes(t.instrument)||
+   !units.isFinite()||units.isZero()||!entry.isFinite()||entry.lte(0)||
+   !stop.isFinite()||stop.lte(0)||!stopValid||t.state!=='OPEN'){
+   this.state.blockedReason='SHADOW_RECOVERY_REQUIRES_BROKER_REVIEW'
+   this.save()
+   return false
+  }
+  this.state.position={
+   tradeId:String(t.id),symbol:String(t.instrument),direction,units:units.abs().toString(),
+   entry:entry.toString(),stop:stop.toString(),originalStop:stop.toString(),
+   startedAt:String(t.openTime||new Date().toISOString())
+  }
+  this.state.blockedReason=null
+  this.state.lastAction={type:'SHADOW_BROKER_RECOVERED',tradeId:String(t.id),at:new Date().toISOString()}
+  this.save()
+  logShadowTrade({event:'SHADOW_BROKER_RECOVERED',source:'OANDA_API',tradeId:String(t.id),symbol:String(t.instrument)})
+  return true
+ }
  private async reconcile(){
   const open:any[]=await this.broker.positions()
   const owned=open.filter(t=>t.clientExtensions?.tag===SHADOW_TAG)
   if(!this.state.position){
-   if(owned.length){this.state.blockedReason='SHADOW_OANDA_POSITION_WITHOUT_LOCAL_STATE';this.save()}
-   return
+   this.recoverShadowPosition(open)
+   if(!this.state.position)return
   }
   const p=this.state.position,t=await this.brokerOwned(p)
   if(t.state==='CLOSED'){
@@ -191,10 +234,12 @@ export class ShadowBrokerFirst {
   this.busy=true
   try{
    logShadowTrade({event:'SHADOW_HEARTBEAT',source:'OANDA_PRACTICE',pairs:SHADOW_OANDA_PAIRS,blockedReason:this.state.blockedReason??null,tradeId:this.state.position?.tradeId??null})
-   if(this.state.blockedReason)return
+   // Always probe broker ownership before honoring a persisted recovery lock.
+   // An old lock must not become permanent after a clean reconciliation.
    const a=await this.broker.account()
    this.risk.recordEquity(a.equity)
    await this.reconcile()
+   if(this.state.blockedReason)return
    if(this.upstreamDegraded){
     this.upstreamDegraded=false;this.lastUpstreamLogAt=0
     logShadowTrade({event:'SHADOW_OANDA_RECOVERED',source:'OANDA_API'})
