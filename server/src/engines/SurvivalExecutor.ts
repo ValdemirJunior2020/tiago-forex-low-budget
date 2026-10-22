@@ -113,15 +113,16 @@ export class SurvivalExecutor{
   const target=direction==='long'?reference.plus(distance.mul('1.3')):reference.minus(distance.mul('1.3'))
   const normalizedStop=await this.broker.formatPrice(symbol,stop.toString())
   const normalizedTarget=await this.broker.formatPrice(symbol,target.toString())
-  const clientId=uniqueId(id,snapshot.updatedAt),tag=symbolTag(id)
+  const candleTime=snapshot.updatedAt
+  const clientId=uniqueId(id,candleTime),tag=symbolTag(id)
   // Preflight BOTH account state and per-agent eligibility. A single global
   // guard serializes all submitters (Shadow/Ollama/Survival).
   await lowBudgetGuard.execute({symbol,direction,units:units.toString(),stop:normalizedStop,referencePrice:reference.toString()},async()=>{
    const open=await this.broker.positions()
    if(open.length>0)throw Error('SURVIVAL_ONE_SHARED_OPEN_TRADE_AT_A_TIME')
    if(this.state.pending)throw Error('SURVIVAL_PENDING_INTENT')
-   this.state.lastAttempt[id]=snapshot.updatedAt
-   this.state.pending={agent:id,clientId,tag,symbol,side:a.side,candle:snapshot.updatedAt,at:now.toISOString(),tradeId:null,status:'SUBMITTING'}
+   this.state.lastAttempt[id]=candleTime
+   this.state.pending={agent:id,clientId,tag,symbol,side:a.side,candle:candleTime,at:now.toISOString(),tradeId:null,status:'SUBMITTING'}
    this.persist('Submitting '+id+' '+a.side+' to OANDA Practice')
    const priceBound=await this.broker.formatPrice(symbol,(direction==='long'?reference.mul('1.001'):reference.mul('0.999')).toString())
    const payload={order:{type:'MARKET',instrument:symbol,units:direction==='long'?units.toFixed(0):units.neg().toFixed(0),
