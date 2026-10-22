@@ -3,7 +3,8 @@ import './SurvivalArena.css'
 type Side='BUY'|'SELL'|'WAIT'
 type Agent={id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct?:number;wrong?:number;realizedPL:number|null;status:string}
 type Note={from:string;to:string;message:string}
-type Snapshot={source:string;updatedAt:string|null;status:string;agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
+type Challenge={id:string;status:string;days:Array<{date:string;realizedPL:number|null;met:boolean|null;tradeCount:number}>}
+type Snapshot={source:string;updatedAt:string|null;status:string;profitChallenge?:Challenge[];agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
 const fallback=[
  ['atlas','Atlas','Tendência','#46cfa9'],['nova','Nova','Reversão','#b792ff'],
  ['pixel','Pixel','Volume','#ffc36f'],['sage','Sage','Proteção','#6db5fc'],
@@ -56,6 +57,7 @@ export default function SurvivalArena(){
  },[])
  const agents=data?.agents?.length===5?data.agents:fallback
  const picked=agents.find(a=>a.id===selected)??agents[0]
+ const financial=data?.profitChallenge?.find(c=>c.id===picked.id)
  const notes=data?.messages??[]
  const note=notes.length?notes[activity%notes.length]:null
  return <section className="arena-page" aria-label="TIAGO Survival Arena">
@@ -102,7 +104,7 @@ export default function SurvivalArena(){
     <div className="arena-world-bottom">
      <span className="arena-activity-dot"/><span>{note?`${note.from} → ${note.to}: ${note.message}`:'Aguardando análises colaborativas da OANDA...'}</span>
     </div>
-    {showHelp&&<div className="arena-help">Os cinco personagens representam pesquisas diferentes sobre os mesmos candles completos da OANDA. Eles trocam conclusões no painel de conversas. Nenhum personagem executa ordens. A energia de sobrevivência muda apenas após a chegada do próximo candle completo da OANDA. É avaliação de previsões, não lucro. O P/L individual permanece indisponível. O Shadow 3/4 continua separado.</div>}
+    {showHelp&&<div className="arena-help">Os cinco personagens representam pesquisas diferentes sobre os mesmos candles completos da OANDA. Eles trocam conclusões no painel de conversas. Nenhum personagem executa ordens. A sobrevivência FINANCEIRA exige US$1 líquido realizado por bot em cada um dos dias 22 e 23 de outubro, com Trade IDs OANDA individualmente atribuídos. A energia é apenas um jogo de previsão, não lucro. Os cinco agentes ainda não enviam ordens. O Shadow 3/4 continua separado.</div>}
    </div>
    <aside className="arena-side">
     <div className="arena-panel">
@@ -122,8 +124,10 @@ export default function SurvivalArena(){
      <div className="arena-detail-line"><span>Energia de sobrevivência</span><b>{picked.life==null?'—':picked.life+' / 100'}</b></div>
      <div className="arena-energy"><div style={{width:(picked.life??0)+'%',background:picked.accent}}/></div>
      <div className="arena-detail-line"><span>Acertos / erros observados</span><b>{picked.correct??0} / {picked.wrong??0}</b></div>
-     <div className="arena-detail-line"><span>P/L individual</span><b>—</b></div>
-     <small>Energia mede previsões contra o candle seguinte (não é lucro). Sem trades OANDA atribuídos individualmente, P/L é indisponível.</small>
+     <div className="arena-detail-line"><span>Meta diária</span><b>US$1 líquido · 2 dias</b></div>
+     {financial?.days.map(d=><div className="arena-detail-line" key={d.date}><span>{d.date.slice(8,10)}/10 · OANDA</span><b>{d.realizedPL===null?'Não atribuído':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(d.realizedPL)}</b></div>)}
+     <div className="arena-detail-line"><span>Sobrevivência financeira</span><b>{financial?.status==='SURVIVED'?'SOBREVIVEU':financial?.status==='ELIMINATED'?'ELIMINADO':financial?.status==='IN_PROGRESS'?'EM DISPUTA':'AGUARDANDO TRADES'}</b></div>
+     <small>Sobreviver exige pelo menos US$1 líquido realizado em cada dia, 22 e 23/10, por Trade IDs oficiais atribuídos ao bot. Energia de previsões não conta para a meta.</small>
     </div>
     <div className="arena-panel"><div className="arena-side-title">CONVERSAS DA EQUIPE</div>
      <div className="arena-chat">{notes.length?notes.map((n,i)=><div className="arena-chat-message" key={i}><strong>{n.from} → {n.to}</strong><span>{n.message}</span></div>):<p>Aguardando dados oficiais da OANDA.</p>}</div>
