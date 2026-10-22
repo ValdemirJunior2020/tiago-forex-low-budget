@@ -4,7 +4,8 @@ type Side='BUY'|'SELL'|'WAIT'
 type Agent={id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct?:number;wrong?:number;realizedPL:number|null;status:string}
 type Note={from:string;to:string;message:string}
 type Challenge={id:string;status:string;days:Array<{date:string;realizedPL:number|null;met:boolean|null;tradeCount:number}>}
-type Snapshot={source:string;updatedAt:string|null;status:string;profitChallenge?:Challenge[];agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
+type Team={coordinator:{side:Side;status:string;reason:string;votes:{buy:number;sell:number;wait:number};canSubmitOrder:false}|null;agentMemoryCounts:Record<string,number>;lastCandle:string|null}
+type Snapshot={source:string;updatedAt:string|null;status:string;team?:Team;profitChallenge?:Challenge[];agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
 const fallback=[
  ['atlas','Atlas','Tendência','#46cfa9'],['nova','Nova','Reversão','#b792ff'],
  ['pixel','Pixel','Volume','#ffc36f'],['sage','Sage','Proteção','#6db5fc'],
@@ -70,6 +71,7 @@ export default function SurvivalArena(){
  const agents=data?.agents?.length===5?data.agents:fallback
  const picked=agents.find(a=>a.id===selected)??agents[0]
  const financial=data?.profitChallenge?.find(c=>c.id===picked.id)
+ const coordinator=data?.team?.coordinator
  const notes=data?.messages??[]
  const note=notes.length?notes[activity%notes.length]:null
  return <section className="arena-page" aria-label="TIAGO Survival Arena">
@@ -133,6 +135,7 @@ export default function SurvivalArena(){
      <p>{picked.reason}</p>
      <div className="arena-detail-line"><span>Decisão analítica</span><b>{picked.side}</b></div>
      <div className="arena-detail-line"><span>Confiança heurística</span><b>{picked.confidence}%</b></div>
+     <div className="arena-detail-line"><span>Memórias salvas</span><b>{data?.team?.agentMemoryCounts?.[picked.id]??0}</b></div>
      <div className="arena-detail-line"><span>Energia de sobrevivência</span><b>{picked.life==null?'—':picked.life+' / 100'}</b></div>
      <div className="arena-energy"><div style={{width:(picked.life??0)+'%',background:picked.accent}}/></div>
      <div className="arena-detail-line"><span>Acertos / erros observados</span><b>{picked.correct??0} / {picked.wrong??0}</b></div>
@@ -141,7 +144,13 @@ export default function SurvivalArena(){
      <div className="arena-detail-line"><span>Sobrevivência financeira</span><b>{financial?.status==='SURVIVED'?'SOBREVIVEU':financial?.status==='ELIMINATED'?'ELIMINADO':financial?.status==='IN_PROGRESS'?'EM DISPUTA':'AGUARDANDO TRADES'}</b></div>
      <small>Sobreviver exige pelo menos US$1 líquido realizado em cada dia, 22 e 23/10, por Trade IDs oficiais atribuídos ao bot. Energia de previsões não conta para a meta.</small>
     </div>
-    <div className="arena-panel"><div className="arena-side-title">CONVERSAS DA EQUIPE</div>
+    <div className="arena-panel arena-safety"><div className="arena-side-title">COORDENADOR • ECHO</div>
+     <div className="arena-detail-line"><span>Parecer da equipe</span><b>{coordinator?.side??'WAIT'}</b></div>
+     <div className="arena-detail-line"><span>Votos BUY / SELL / WAIT</span><b>{coordinator?`${coordinator.votes.buy} / ${coordinator.votes.sell} / ${coordinator.votes.wait}`:'—'}</b></div>
+     <p>{coordinator?.reason??'Aguardando candles completos da OANDA para coordenar os agentes.'}</p>
+     <small>O coordenador compartilha pesquisas e registra decisões, mas não envia ordens.</small>
+    </div>
+    <div className="arena-panel"><div className="arena-side-title">CONVERSAS DA EQUIPE <span>REGISTROS REAIS</span></div>
      <div className="arena-chat">{notes.length?notes.map((n,i)=><div className="arena-chat-message" key={i}><strong>{n.from} → {n.to}</strong><span>{n.message}</span></div>):<p>Aguardando dados oficiais da OANDA.</p>}</div>
     </div>
     <div className="arena-panel arena-safety"><b>🛡️ Limites protegidos</b><p>Somente pesquisa nesta arena. Shadow não foi modificado. Novas entradas têm prazo definido; posições existentes exigem acompanhamento na OANDA.</p><small>{data?.updatedAt?'Último candle OANDA: '+new Date(data.updatedAt).toLocaleString('pt-BR'):'Fonte oficial temporariamente indisponível'}</small></div>
