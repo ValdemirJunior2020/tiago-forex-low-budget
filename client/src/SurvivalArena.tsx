@@ -5,7 +5,8 @@ type Agent={id:string;name:string;role:string;accent:string;side:Side;reason:str
 type Note={from:string;to:string;message:string}
 type Challenge={id:string;status:string;days:Array<{date:string;realizedPL:number|null;met:boolean|null;tradeCount:number}>}
 type Team={coordinator:{side:Side;status:string;reason:string;votes:{buy:number;sell:number;wait:number};canSubmitOrder:false}|null;agentMemoryCounts:Record<string,number>;lastCandle:string|null}
-type Snapshot={source:string;updatedAt:string|null;status:string;team?:Team;profitChallenge?:Challenge[];agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
+type Execution={enabled:boolean;mode:string;pending:{agent:string;tradeId:string|null;status:string;side:Side}|null;events:Array<{at:string;message:string}>}
+type Snapshot={source:string;updatedAt:string|null;status:string;execution?:Execution;team?:Team;profitChallenge?:Challenge[];agents:Agent[];messages:Note[];riskMessage:string;expiresAt:string}
 const fallback=[
  ['atlas','Atlas','Tendência','#46cfa9'],['nova','Nova','Reversão','#b792ff'],
  ['pixel','Pixel','Volume','#ffc36f'],['sage','Sage','Proteção','#6db5fc'],
@@ -79,7 +80,7 @@ export default function SurvivalArena(){
    <div><span className="arena-kicker">TIAGO • AI SURVIVAL ARENA</span>
     <h2>O escritório dos <em>5 agentes</em></h2>
     <p>Uma arena colaborativa inspirada no escritório isométrico. Análises reais da OANDA, sem P/L inventado.</p></div>
-   <div className="arena-tag"><span className="arena-status-dot"/> {data?.source==='OANDA_COMPLETED_CANDLES'?'OANDA • CANDLES CONFIRMADOS':'AGUARDANDO OANDA'}<small>PESQUISA • SEM ORDENS DOS AGENTES</small></div>
+   <div className="arena-tag"><span className="arena-status-dot"/> {data?.source==='OANDA_COMPLETED_CANDLES'?'OANDA • CANDLES CONFIRMADOS':'AGUARDANDO OANDA'}<small>{data?.execution?.enabled?'CINCO COMPETIDORES • OANDA PRACTICE':'ENTRADAS DESATIVADAS • AGUARDANDO ATIVAÇÃO'}</small></div>
   </div>
   <div className="arena-layout">
    <div className="arena-world">
@@ -118,7 +119,7 @@ export default function SurvivalArena(){
     <div className="arena-world-bottom">
      <span className="arena-activity-dot"/><span>{note?`${note.from} → ${note.to}: ${note.message}`:'Aguardando análises colaborativas da OANDA...'}</span>
     </div>
-    {showHelp&&<div className="arena-help">Os cinco personagens representam pesquisas diferentes sobre os mesmos candles completos da OANDA. Eles trocam conclusões no painel de conversas. Nenhum personagem executa ordens. A sobrevivência FINANCEIRA exige US$1 líquido realizado por bot em cada um dos dias 22 e 23 de outubro, com Trade IDs OANDA individualmente atribuídos. A energia é apenas um jogo de previsão, não lucro. Os cinco agentes ainda não enviam ordens. O Shadow 3/4 continua separado.</div>}
+    {showHelp&&<div className="arena-help">Os cinco personagens representam pesquisas diferentes sobre os mesmos candles completos da OANDA. Eles trocam conclusões no painel de conversas. Nenhum personagem executa ordens. A sobrevivência FINANCEIRA exige US$1 líquido realizado por bot em cada um dos dias 22 e 23 de outubro, com Trade IDs OANDA individualmente atribuídos. A energia é apenas um jogo de previsão, não lucro. Cada agente pode solicitar operação própria quando a execução estiver habilitada e a corretora e o risco confirmarem. O Shadow 3/4 continua separado.</div>}
    </div>
    <aside className="arena-side">
     <div className="arena-panel">
@@ -153,7 +154,14 @@ export default function SurvivalArena(){
     <div className="arena-panel"><div className="arena-side-title">CONVERSAS DA EQUIPE <span>REGISTROS REAIS</span></div>
      <div className="arena-chat">{notes.length?notes.map((n,i)=><div className="arena-chat-message" key={i}><strong>{n.from} → {n.to}</strong><span>{n.message}</span></div>):<p>Aguardando dados oficiais da OANDA.</p>}</div>
     </div>
-    <div className="arena-panel arena-safety"><b>🛡️ Limites protegidos</b><p>Somente pesquisa nesta arena. Shadow não foi modificado. Novas entradas têm prazo definido; posições existentes exigem acompanhamento na OANDA.</p><small>{data?.updatedAt?'Último candle OANDA: '+new Date(data.updatedAt).toLocaleString('pt-BR'):'Fonte oficial temporariamente indisponível'}</small></div>
+    <div className="arena-panel"><div className="arena-side-title">EXECUÇÃO DOS CINCO AGENTES</div>
+     <div className="arena-detail-line"><span>Status das ordens</span><b>{data?.execution?.enabled?'HABILITADAS':'DESATIVADAS'}</b></div>
+     <div className="arena-detail-line"><span>Agente com operação</span><b>{data?.execution?.pending?.agent?.toUpperCase()??'NENHUM'}</b></div>
+     <div className="arena-detail-line"><span>Trade ID OANDA</span><b>{data?.execution?.pending?.tradeId??'—'}</b></div>
+     <div className="arena-chat">{data?.execution?.events?.slice(-4).reverse().map((e,i)=><div className="arena-chat-message" key={i}><strong>{new Date(e.at).toLocaleString('pt-BR')}</strong><span>{e.message}</span></div>)}</div>
+     <small>As ordens são individuais, mas o orçamento de risco é compartilhado. A meta de US$1/dia não altera limites nem força entradas.</small>
+    </div>
+    <div className="arena-panel arena-safety"><b>🛡️ Limites protegidos</b><p>Cinco bots podem abrir ordens na OANDA Practice somente com habilitação local e risco aprovado. Shadow 3/4 não foi modificado. Não há ordens na conta real.</p><small>{data?.updatedAt?'Último candle OANDA: '+new Date(data.updatedAt).toLocaleString('pt-BR'):'Fonte oficial temporariamente indisponível'}</small></div>
    </aside>
   </div>
  </section>
