@@ -91,3 +91,38 @@ default. Changing `.env` requires restarting the local server.
 - Status: `/api/survival-arena` and `/api/survival-execution`.
   Broker operations are **not** guaranteed profitable. The tests verify logic
   with mocked scenarios, not the user's live account connectivity.
+
+## NEAT Neuroevolution — genuine local neat-python integration
+
+The single `START-FOREX-POBRE.bat` checks for the Python launcher and
+installs the published `neat-python==2.0.0` package if missing. No paid AI API
+or Git checkout of NEAT is needed. The executable is `neat/neat_agents.py`
+and the upstream project is
+https://github.com/CodeReclaimers/neat-python (3-clause BSD license).
+
+At startup the backend asynchronously retrieves 500 **completed** M5
+EUR/USD candles from OANDA Practice, evolves **five independent** networks
+(one each for Atlas, Nova, Pixel, Sage and Echo; 16-genome population,
+five generations per agent), and then produces new research signals.
+The first 72% of the data is used for evolution, the later 28% reserved
+for chronological holdout scoring. The model is retrained no more than
+once per trading day using the most recent completed-candle history.
+
+Open `http://127.0.0.1:8791/api/neat` or the NEAT panel in the office
+to check `TRAINING`, `READY` or `ERROR`, per-agent research signals and
+holdout metrics. Individual model files live in `data/neat-models/` and
+never belong in Git; do not import pickles from strangers. The data snapshot
+used for research is kept in `data/neat-candles.json`.
+
+**CRITICAL**: NEAT scores are a historical PRICE proxy, NOT broker profit
+and not a claim of strategy edge. Evolved research signals do not place
+orders, and no newly evolved model is automatically approved for live
+execution. The five existing Practice execution strategies remain unchanged,
+and the original Shadow 3/4 is untouched. The US$1/day financial survival
+score comes exclusively from OANDA-confirmed closed trades, never NEAT
+research scores.
+
+GitHub Actions tests both TypeScript and actual Python NEAT training and
+prediction (`python neat/smoke_test.py`) on generated test candles.
+Those generated candles exist solely inside the smoke test and cannot
+be mistaken for real OANDA data.
