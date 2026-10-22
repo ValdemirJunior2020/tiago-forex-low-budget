@@ -27,7 +27,13 @@ function decide(id:string,bars:Candle[]):{side:Side;reason:string;confidence:num
   case 'nova':return{side:loc<.12?'BUY':loc>.88?'SELL':'WAIT',reason:'Posição no canal de 20 candles',confidence:Math.round(Math.abs(loc-.5)*200)}
   case 'pixel':return{side:activity>1.4?(last.close>last.open?'BUY':'SELL'):'WAIT',reason:'Volume relativo '+activity.toFixed(2)+'×; requer >1,40×',confidence:Math.round(Math.min(100,activity*35))}
   case 'sage':return{side:activity<.7?'WAIT':Math.abs(momentum)>spread*.12?(momentum>0?'BUY':'SELL'):'WAIT',reason:'Filtro de atividade e amplitude do mercado',confidence:Math.round(Math.min(100,Math.abs(momentum)/spread*150))}
-  default:return{side:'WAIT',reason:'Aguardando sinais das outras mesas',confidence:0}
+  case 'echo':{
+   const highs=bars.slice(-13,-1).map(b=>b.high),lows=bars.slice(-13,-1).map(b=>b.low)
+   const breakoutHigh=Math.max(...highs),breakoutLow=Math.min(...lows)
+   const side=last.close>breakoutHigh?'BUY':last.close<breakoutLow?'SELL':'WAIT'
+   return{side,reason:'Estratégia própria de rompimento de 12 candles; decisões independentes',confidence:side==='WAIT'?0:Math.round(Math.min(100,50+Math.abs(momentum)/spread*80))}
+  }
+  default:return{side:'WAIT',reason:'Sem estratégia',confidence:0}
  }
 }
 type Snapshot={source:string;updatedAt:string|null;status:string;profitChallenge:AgentChallenge[];team:{coordinator:ReturnType<ArenaTeamMemory['snapshot']>['decision'];agentMemoryCounts:Record<string,number>;lastCandle:string|null};agents:Array<{id:string;name:string;role:string;accent:string;side:Side;reason:string;confidence:number;life:number|null;correct:number;wrong:number;realizedPL:null;status:string}>;messages:Array<{from:string;to:string;message:string}>;riskMessage:string;expiresAt:string}
@@ -51,9 +57,6 @@ export class SurvivalArena {
     messages:[],riskMessage:'OANDA indisponível: nenhuma decisão ou P/L estimado.',expiresAt:expiry}
   }
   const advice=profiles.map(p=>({...p,...decide(p.id,bars),life:null,correct:0,wrong:0,realizedPL:null,status:'RESEARCH_ONLY'}))
-  const votes=advice.slice(0,4).reduce((a,p)=>{if(p.side==='BUY')a.buy++;if(p.side==='SELL')a.sell++;return a},{buy:0,sell:0})
-  const agreement=votes.buy>=3?'BUY':votes.sell>=3?'SELL':'WAIT'
-  advice[4]={...advice[4],side:agreement,reason:agreement==='WAIT'?'Sem consenso de 3 entre 4 especialistas':'Consenso de '+Math.max(votes.buy,votes.sell)+'/4 especialistas',confidence:Math.round(Math.max(votes.buy,votes.sell)*25)}
   const candle=bars.at(-1)
   const ledger=candle&&bars.length>=30
    ?this.ledger.record({time:candle.time,close:candle.close},advice.map(a=>({id:a.id,side:a.side})))
