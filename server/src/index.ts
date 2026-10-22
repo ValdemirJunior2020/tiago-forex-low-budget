@@ -14,9 +14,10 @@ import {openVikingBridge} from './engines/OpenVikingBridge.js'
 import {oandaAuthGate} from './broker/OandaAuthGate.js'
 import {oandaAvailabilityGate} from './broker/OandaAvailabilityGate.js'
 import {SurvivalArena} from './engines/SurvivalArena.js'
+import {SurvivalExecutor} from './engines/SurvivalExecutor.js'
 
 const app=express(),broker=new OandaReadOnly(),risk=new RiskManager(),engine=new ShadowBrokerFirst(broker),
- ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot()),arena=new SurvivalArena(broker)
+ ollamaMirror=new OllamaPracticeMirror(()=>engine.ollamaSnapshot(),()=>engine.shadowSnapshot()),arena=new SurvivalArena(broker),survival=new SurvivalExecutor({arena,broker})
 
 app.use(helmet())
 app.use(cors({origin:env.CLIENT_ORIGIN}))
@@ -44,7 +45,8 @@ app.get('/health',async(_q,res)=>{
   })
 })
 
-app.get('/api/survival-arena',async(_q,res)=>res.json(await arena.snapshot()))
+app.get('/api/survival-arena',async(_q,res)=>res.json({...await arena.snapshot(),execution:survival.snapshot()}))
+app.get('/api/survival-execution',(_q,res)=>res.json(survival.snapshot()))
 
 app.get('/api/openviking',async(_q,res)=>res.json(await openVikingBridge.health()))
 
@@ -178,4 +180,5 @@ app.listen(env.PORT,'127.0.0.1',()=>{
  console.log(`Forex-Pobre OANDA Practice http://127.0.0.1:${env.PORT}`)
  engine.start()
  ollamaMirror.start()
+ survival.start()
 })
